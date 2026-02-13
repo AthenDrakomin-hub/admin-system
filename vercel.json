@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/market-refresh",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/settlement",
+      "schedule": "0 16 * * 1-5"
+    }
+  ]
+}
