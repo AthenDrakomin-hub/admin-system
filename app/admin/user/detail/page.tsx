@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { User } from "lucide-react";
 
-export default function UserDetailPage() {
+function UserDetailContent() {
   const searchParams = useSearchParams();
   const userId = searchParams.get("userId");
   const [user, setUser] = useState<any>(null);
@@ -122,5 +122,13 @@ export default function UserDetailPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function UserDetailPage() {
+  return (
+    <Suspense fallback={<div className="text-center py-12">加载中...</div>}>
+      <UserDetailContent />
+    </Suspense>
   );
 }

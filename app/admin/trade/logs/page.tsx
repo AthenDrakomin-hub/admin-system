@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { ArrowLeft, RefreshCw } from "lucide-react";
 import Link from "next/link";
@@ -15,7 +15,7 @@ interface OrderLog {
   created_at: string;
 }
 
-export default function OrderLogsPage() {
+function OrderLogsContent() {
   const searchParams = useSearchParams();
   const orderId = searchParams.get("orderId");
   const [logs, setLogs] = useState<OrderLog[]>([]);
@@ -122,5 +122,13 @@ export default function OrderLogsPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function OrderLogsPage() {
+  return (
+    <Suspense fallback={<div className="text-center py-12">加载中...</div>}>
+      <OrderLogsContent />
+    </Suspense>
   );
 }
