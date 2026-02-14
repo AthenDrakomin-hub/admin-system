@@ -12,12 +12,6 @@ export async function GET(req: NextRequest) {
       results.push({ task: '行情刷新', ...marketData });
     }
 
-    // 16:00 - 每日结算（如需要）
-    if (hour === 16) {
-      // TODO: 添加每日结算逻辑
-      results.push({ task: '每日结算', success: true, message: '暂未实现' });
-    }
-
     return NextResponse.json({
       success: true,
       time: new Date().toISOString(),
