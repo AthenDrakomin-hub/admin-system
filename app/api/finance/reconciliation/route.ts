@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
+export const dynamic = 'force-dynamic';
+
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_SUPABASE_SERVICE_ROLE_KEY!;
 
 export async function GET(req: NextRequest) {
   try {
     const supabase = createClient(supabaseUrl, supabaseKey);
-    const { searchParams } = new URL(req.url);
+    const { searchParams } = req.nextUrl;
     const period = searchParams.get('period') || 'day';
 
     const now = new Date();
