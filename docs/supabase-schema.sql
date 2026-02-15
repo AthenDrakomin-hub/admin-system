@@ -1,10 +1,26 @@
--- Supabase 数据库建表脚本
+-- Supabase 数据库建表脚本（完整版）
 -- 适用于银河证券-证裕交易单元管理系统
+-- 注意：此版本已更新为完整版本，包含所有必要的表和功能
 
 -- 启用 UUID 扩展
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- 用户表
+-- 创建表（按依赖顺序）
+
+-- 机构表（新增）
+CREATE TABLE organizations (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(100) NOT NULL UNIQUE,
+    code VARCHAR(50) UNIQUE,
+    contact_person VARCHAR(100),
+    contact_phone VARCHAR(20),
+    contact_email VARCHAR(100),
+    status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'disabled')),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 用户表（已更新，添加机构关联字段）
 CREATE TABLE users (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     username VARCHAR(50) UNIQUE NOT NULL,
@@ -14,16 +30,21 @@ CREATE TABLE users (
     balance_cny DECIMAL(15,2) DEFAULT 0.00,
     balance_hkd DECIMAL(15,2) DEFAULT 0.00,
     frozen_balance DECIMAL(15,2) DEFAULT 0.00,
-    status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'frozen', 'disabled')),
+    status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'active', 'rejected', 'disabled')),
+    organization_id UUID REFERENCES organizations(id),
+    reviewed_by UUID,
+    reviewed_at TIMESTAMPTZ,
+    reject_reason TEXT,
+    invitation_code VARCHAR(20),
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 订单表
+-- 订单表（已更新，支持更多交易类型）
 CREATE TABLE orders (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-    trade_type VARCHAR(20) NOT NULL CHECK (trade_type IN ('a_share', 'hk_share', 'ipo', 'block', 'board')),
+    trade_type VARCHAR(30) NOT NULL CHECK (trade_type IN ('a_share', 'hk_share', 'ipo', 'block', 'board', 'conditional', 'abnormal')),
     symbol VARCHAR(20) NOT NULL,
     side VARCHAR(10) NOT NULL CHECK (side IN ('buy', 'sell')),
     quantity INTEGER NOT NULL,
@@ -33,6 +54,9 @@ CREATE TABLE orders (
     trade_data JSONB,
     approved_by UUID,
     approved_at TIMESTAMPTZ,
+    is_abnormal BOOLEAN DEFAULT FALSE,
+    abnormal_reason TEXT,
+    manual_review_required BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -91,7 +115,7 @@ CREATE TABLE withdraw_requests (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 审计日志表
+-- 审计日志表（已增强）
 CREATE TABLE audit_logs (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     action_type VARCHAR(50) NOT NULL,
@@ -103,6 +127,12 @@ CREATE TABLE audit_logs (
     after_data JSONB,
     ip_address VARCHAR(45),
     user_agent TEXT,
+    operation_result VARCHAR(20) CHECK (operation_result IN ('success', 'failure', 'partial')),
+    error_message TEXT,
+    execution_time_ms INTEGER,
+    business_module VARCHAR(50),
+    api_endpoint VARCHAR(255),
+    http_method VARCHAR(10),
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -139,18 +169,63 @@ CREATE TABLE global_config (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- 邀请码表（新增）
+CREATE TABLE invitation_codes (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    code VARCHAR(20) NOT NULL UNIQUE,
+    organization_id UUID REFERENCES organizations(id) ON DELETE CASCADE,
+    created_by UUID,
+    max_uses INTEGER DEFAULT 1,
+    used_count INTEGER DEFAULT 0,
+    expires_at TIMESTAMPTZ,
+    status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'disabled', 'expired')),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 系统消息表（新增）
+CREATE TABLE system_messages (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    type VARCHAR(50) NOT NULL CHECK (type IN ('system', 'audit_approved', 'audit_rejected', 'trade', 'finance')),
+    title VARCHAR(200) NOT NULL,
+    content TEXT NOT NULL,
+    sent_by UUID,
+    sent_at TIMESTAMPTZ DEFAULT NOW(),
+    read BOOLEAN DEFAULT FALSE,
+    read_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 消息模板表（新增）
+CREATE TABLE message_templates (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    type VARCHAR(50) NOT NULL UNIQUE CHECK (type IN ('audit_approved', 'audit_rejected', 'welcome', 'password_reset')),
+    title VARCHAR(200) NOT NULL,
+    content TEXT NOT NULL,
+    variables JSONB,
+    updated_by UUID,
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- 创建索引以提高查询性能
 
 -- 用户表索引
 CREATE INDEX idx_users_username ON users(username);
 CREATE INDEX idx_users_status ON users(status);
 CREATE INDEX idx_users_created_at ON users(created_at);
+CREATE INDEX idx_users_organization ON users(organization_id);
+CREATE INDEX idx_users_reviewed_at ON users(reviewed_at);
 
 -- 订单表索引
 CREATE INDEX idx_orders_user_id ON orders(user_id);
 CREATE INDEX idx_orders_status ON orders(status);
 CREATE INDEX idx_orders_trade_type ON orders(trade_type);
 CREATE INDEX idx_orders_created_at ON orders(created_at);
+CREATE INDEX idx_orders_is_abnormal ON orders(is_abnormal);
+CREATE INDEX idx_orders_manual_review ON orders(manual_review_required);
+CREATE INDEX idx_orders_type_status ON orders(trade_type, status);
 
 -- 持仓表索引
 CREATE INDEX idx_positions_user_id ON positions(user_id);
@@ -172,6 +247,10 @@ CREATE INDEX idx_withdraw_requests_status ON withdraw_requests(status);
 CREATE INDEX idx_audit_logs_operator_id ON audit_logs(operator_id);
 CREATE INDEX idx_audit_logs_action_type ON audit_logs(action_type);
 CREATE INDEX idx_audit_logs_created_at ON audit_logs(created_at);
+CREATE INDEX idx_audit_logs_business_module ON audit_logs(business_module);
+CREATE INDEX idx_audit_logs_operation_result ON audit_logs(operation_result);
+CREATE INDEX idx_audit_logs_api_endpoint ON audit_logs(api_endpoint);
+CREATE INDEX idx_audit_logs_operator_time ON audit_logs(operator_id, created_at DESC);
 
 -- 新股申购索引
 CREATE INDEX idx_ipo_applications_user_id ON ipo_applications(user_id);
@@ -180,6 +259,25 @@ CREATE INDEX idx_ipo_applications_ipo_code ON ipo_applications(ipo_code);
 -- 管理员索引
 CREATE INDEX idx_admins_username ON admins(username);
 CREATE INDEX idx_admins_role ON admins(role);
+
+-- 机构表索引
+CREATE INDEX idx_organizations_name ON organizations(name);
+CREATE INDEX idx_organizations_status ON organizations(status);
+
+-- 邀请码表索引
+CREATE INDEX idx_invitation_codes_code ON invitation_codes(code);
+CREATE INDEX idx_invitation_codes_organization ON invitation_codes(organization_id);
+CREATE INDEX idx_invitation_codes_status ON invitation_codes(status);
+CREATE INDEX idx_invitation_codes_expires ON invitation_codes(expires_at);
+
+-- 系统消息表索引
+CREATE INDEX idx_system_messages_user_id ON system_messages(user_id);
+CREATE INDEX idx_system_messages_type ON system_messages(type);
+CREATE INDEX idx_system_messages_sent_at ON system_messages(sent_at);
+CREATE INDEX idx_system_messages_read ON system_messages(read);
+
+-- 消息模板表索引
+CREATE INDEX idx_message_templates_type ON message_templates(type);
 
 -- 插入默认管理员账号 (密码: admin123456)
 INSERT INTO admins (username, password_hash, role) 
@@ -193,8 +291,25 @@ INSERT INTO global_config (config_key, config_value, description) VALUES
 ('board_trade_limit', '1000000', '打板交易限额'),
 ('block_trade_threshold', '5000000', '大宗交易门槛'),
 ('withdraw_min_amount', '100', '最小提现金额'),
-('withdraw_max_amount', '50000', '最大提现金额')
+('withdraw_max_amount', '50000', '最大提现金额'),
+('conditional_order_enabled', 'true', '是否启用条件单功能'),
+('board_trading_enabled', 'true', '是否启用一键打板功能'),
+('abnormal_order_threshold', '1000000', '异常订单金额阈值（CNY）'),
+('data_retention_days', '1095', '数据保留天数（3年）')
 ON CONFLICT (config_key) DO NOTHING;
+
+-- 插入默认机构
+INSERT INTO organizations (id, name, code, status) VALUES
+('00000000-0000-0000-0000-000000000001', '默认机构', 'DEFAULT', 'active')
+ON CONFLICT (id) DO NOTHING;
+
+-- 插入默认消息模板
+INSERT INTO message_templates (type, title, content, variables) VALUES
+('audit_approved', '审核通过通知', '尊敬的{username}，您的账号审核已通过，现在可以正常使用系统功能。', '{"username": "用户姓名"}'),
+('audit_rejected', '审核驳回通知', '尊敬的{username}，您的账号审核未通过，原因：{reason}。请修改后重新提交审核。', '{"username": "用户姓名", "reason": "驳回原因"}'),
+('welcome', '欢迎使用系统', '尊敬的{username}，欢迎使用我们的交易系统！', '{"username": "用户姓名"}'),
+('password_reset', '密码重置通知', '您的密码已重置，新密码为：{password}，请及时登录修改。', '{"password": "新密码"}')
+ON CONFLICT (type) DO NOTHING;
 
 -- 启用行级安全 (RLS)
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
@@ -207,6 +322,10 @@ ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ipo_applications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE admins ENABLE ROW LEVEL SECURITY;
 ALTER TABLE global_config ENABLE ROW LEVEL SECURITY;
+ALTER TABLE organizations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE invitation_codes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE system_messages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE message_templates ENABLE ROW LEVEL SECURITY;
 
 -- 创建审计日志触发器函数
 CREATE OR REPLACE FUNCTION audit_trigger_function()
@@ -261,3 +380,15 @@ COMMENT ON TABLE audit_logs IS '审计日志表，记录所有关键操作';
 COMMENT ON TABLE ipo_applications IS '新股申购表，记录用户新股申购申请';
 COMMENT ON TABLE admins IS '管理员表，存储后台管理员信息';
 COMMENT ON TABLE global_config IS '全局配置表，存储系统配置参数';
+COMMENT ON TABLE organizations IS '机构表，存储机构信息';
+COMMENT ON TABLE invitation_codes IS '邀请码表，存储用户邀请码信息';
+COMMENT ON TABLE system_messages IS '系统消息表，存储系统发送给用户的消息';
+COMMENT ON TABLE message_templates IS '消息模板表，存储消息模板';
+
+-- 完成消息
+DO $$
+BEGIN
+    RAISE NOTICE '数据库建表脚本执行完成！';
+    RAISE NOTICE '已创建15个表，包含所有必要的约束、索引、默认数据、RLS和审计触发器。';
+    RAISE NOTICE '此版本为完整版，包含机构管理、邀请码、系统消息等新增功能。';
+END $$;
