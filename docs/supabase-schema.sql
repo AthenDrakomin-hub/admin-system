@@ -5,10 +5,9 @@
 -- 启用 UUID 扩展
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- 创建表（按依赖顺序）
-
+-- 创建表（按依赖顺序，IF NOT EXISTS 可重复执行）
 -- 机构表（新增）
-CREATE TABLE organizations (
+CREATE TABLE IF NOT EXISTS organizations (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name VARCHAR(100) NOT NULL UNIQUE,
     code VARCHAR(50) UNIQUE,
@@ -21,7 +20,7 @@ CREATE TABLE organizations (
 );
 
 -- 用户表（已更新，添加机构关联字段）
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     username VARCHAR(50) UNIQUE NOT NULL,
     real_name VARCHAR(100),
@@ -41,7 +40,7 @@ CREATE TABLE users (
 );
 
 -- 订单表（已更新，支持更多交易类型）
-CREATE TABLE orders (
+CREATE TABLE IF NOT EXISTS orders (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
     trade_type VARCHAR(30) NOT NULL CHECK (trade_type IN ('a_share', 'hk_share', 'ipo', 'block', 'board', 'conditional', 'abnormal')),
@@ -62,7 +61,7 @@ CREATE TABLE orders (
 );
 
 -- 持仓表
-CREATE TABLE positions (
+CREATE TABLE IF NOT EXISTS positions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
     symbol VARCHAR(20) NOT NULL,
@@ -76,7 +75,7 @@ CREATE TABLE positions (
 );
 
 -- 交易流水表
-CREATE TABLE transaction_flows (
+CREATE TABLE IF NOT EXISTS transaction_flows (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
     type VARCHAR(20) NOT NULL CHECK (type IN ('recharge', 'withdraw', 'trade', 'fee', 'dividend')),
@@ -89,7 +88,7 @@ CREATE TABLE transaction_flows (
 );
 
 -- 充值申请表
-CREATE TABLE recharge_requests (
+CREATE TABLE IF NOT EXISTS recharge_requests (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
     amount DECIMAL(15,2) NOT NULL,
@@ -102,7 +101,7 @@ CREATE TABLE recharge_requests (
 );
 
 -- 提现申请表
-CREATE TABLE withdraw_requests (
+CREATE TABLE IF NOT EXISTS withdraw_requests (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
     amount DECIMAL(15,2) NOT NULL,
@@ -116,7 +115,7 @@ CREATE TABLE withdraw_requests (
 );
 
 -- 审计日志表（已增强）
-CREATE TABLE audit_logs (
+CREATE TABLE IF NOT EXISTS audit_logs (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     action_type VARCHAR(50) NOT NULL,
     operator_id UUID,
@@ -137,7 +136,7 @@ CREATE TABLE audit_logs (
 );
 
 -- 新股申购表
-CREATE TABLE ipo_applications (
+CREATE TABLE IF NOT EXISTS ipo_applications (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
     ipo_code VARCHAR(20) NOT NULL,
@@ -150,18 +149,18 @@ CREATE TABLE ipo_applications (
 );
 
 -- 管理员表
-CREATE TABLE admins (
+CREATE TABLE IF NOT EXISTS admins (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     username VARCHAR(50) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
-    role VARCHAR(20) DEFAULT 'admin' CHECK (role IN ('admin', 'super_admin', 'auditor')),
+    role VARCHAR(20) DEFAULT 'admin' CHECK (role IN ('admin', 'super_admin', 'auditor', 'finance_manager')),
     status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'disabled')),
     last_login_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- 全局配置表
-CREATE TABLE global_config (
+CREATE TABLE IF NOT EXISTS global_config (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     config_key VARCHAR(100) UNIQUE NOT NULL,
     config_value TEXT,
@@ -169,8 +168,20 @@ CREATE TABLE global_config (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- 管理端系统配置表（/api/admin/config 使用）
+CREATE TABLE IF NOT EXISTS system_configs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    category VARCHAR(50) NOT NULL,
+    key VARCHAR(100) NOT NULL,
+    value TEXT,
+    updated_by UUID,
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(category, key)
+);
+CREATE INDEX IF NOT EXISTS idx_system_configs_category ON system_configs(category);
+
 -- 邀请码表（新增）
-CREATE TABLE invitation_codes (
+CREATE TABLE IF NOT EXISTS invitation_codes (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     code VARCHAR(20) NOT NULL UNIQUE,
     organization_id UUID REFERENCES organizations(id) ON DELETE CASCADE,
@@ -184,7 +195,7 @@ CREATE TABLE invitation_codes (
 );
 
 -- 系统消息表（新增）
-CREATE TABLE system_messages (
+CREATE TABLE IF NOT EXISTS system_messages (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
     type VARCHAR(50) NOT NULL CHECK (type IN ('system', 'audit_approved', 'audit_rejected', 'trade', 'finance')),
@@ -198,7 +209,7 @@ CREATE TABLE system_messages (
 );
 
 -- 消息模板表（新增）
-CREATE TABLE message_templates (
+CREATE TABLE IF NOT EXISTS message_templates (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     type VARCHAR(50) NOT NULL UNIQUE CHECK (type IN ('audit_approved', 'audit_rejected', 'welcome', 'password_reset')),
     title VARCHAR(200) NOT NULL,
@@ -212,76 +223,76 @@ CREATE TABLE message_templates (
 -- 创建索引以提高查询性能
 
 -- 用户表索引
-CREATE INDEX idx_users_username ON users(username);
-CREATE INDEX idx_users_status ON users(status);
-CREATE INDEX idx_users_created_at ON users(created_at);
-CREATE INDEX idx_users_organization ON users(organization_id);
-CREATE INDEX idx_users_reviewed_at ON users(reviewed_at);
+CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
+CREATE INDEX IF NOT EXISTS idx_users_status ON users(status);
+CREATE INDEX IF NOT EXISTS idx_users_created_at ON users(created_at);
+CREATE INDEX IF NOT EXISTS idx_users_organization ON users(organization_id);
+CREATE INDEX IF NOT EXISTS idx_users_reviewed_at ON users(reviewed_at);
 
 -- 订单表索引
-CREATE INDEX idx_orders_user_id ON orders(user_id);
-CREATE INDEX idx_orders_status ON orders(status);
-CREATE INDEX idx_orders_trade_type ON orders(trade_type);
-CREATE INDEX idx_orders_created_at ON orders(created_at);
-CREATE INDEX idx_orders_is_abnormal ON orders(is_abnormal);
-CREATE INDEX idx_orders_manual_review ON orders(manual_review_required);
-CREATE INDEX idx_orders_type_status ON orders(trade_type, status);
+CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
+CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
+CREATE INDEX IF NOT EXISTS idx_orders_trade_type ON orders(trade_type);
+CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders(created_at);
+CREATE INDEX IF NOT EXISTS idx_orders_is_abnormal ON orders(is_abnormal);
+CREATE INDEX IF NOT EXISTS idx_orders_manual_review ON orders(manual_review_required);
+CREATE INDEX IF NOT EXISTS idx_orders_type_status ON orders(trade_type, status);
 
 -- 持仓表索引
-CREATE INDEX idx_positions_user_id ON positions(user_id);
-CREATE INDEX idx_positions_symbol ON positions(symbol);
+CREATE INDEX IF NOT EXISTS idx_positions_user_id ON positions(user_id);
+CREATE INDEX IF NOT EXISTS idx_positions_symbol ON positions(symbol);
 
 -- 流水表索引
-CREATE INDEX idx_transaction_flows_user_id ON transaction_flows(user_id);
-CREATE INDEX idx_transaction_flows_type ON transaction_flows(type);
-CREATE INDEX idx_transaction_flows_settled ON transaction_flows(settled);
-CREATE INDEX idx_transaction_flows_created_at ON transaction_flows(created_at);
+CREATE INDEX IF NOT EXISTS idx_transaction_flows_user_id ON transaction_flows(user_id);
+CREATE INDEX IF NOT EXISTS idx_transaction_flows_type ON transaction_flows(type);
+CREATE INDEX IF NOT EXISTS idx_transaction_flows_settled ON transaction_flows(settled);
+CREATE INDEX IF NOT EXISTS idx_transaction_flows_created_at ON transaction_flows(created_at);
 
 -- 充值提现索引
-CREATE INDEX idx_recharge_requests_user_id ON recharge_requests(user_id);
-CREATE INDEX idx_recharge_requests_status ON recharge_requests(status);
-CREATE INDEX idx_withdraw_requests_user_id ON withdraw_requests(user_id);
-CREATE INDEX idx_withdraw_requests_status ON withdraw_requests(status);
+CREATE INDEX IF NOT EXISTS idx_recharge_requests_user_id ON recharge_requests(user_id);
+CREATE INDEX IF NOT EXISTS idx_recharge_requests_status ON recharge_requests(status);
+CREATE INDEX IF NOT EXISTS idx_withdraw_requests_user_id ON withdraw_requests(user_id);
+CREATE INDEX IF NOT EXISTS idx_withdraw_requests_status ON withdraw_requests(status);
 
 -- 审计日志索引
-CREATE INDEX idx_audit_logs_operator_id ON audit_logs(operator_id);
-CREATE INDEX idx_audit_logs_action_type ON audit_logs(action_type);
-CREATE INDEX idx_audit_logs_created_at ON audit_logs(created_at);
-CREATE INDEX idx_audit_logs_business_module ON audit_logs(business_module);
-CREATE INDEX idx_audit_logs_operation_result ON audit_logs(operation_result);
-CREATE INDEX idx_audit_logs_api_endpoint ON audit_logs(api_endpoint);
-CREATE INDEX idx_audit_logs_operator_time ON audit_logs(operator_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_operator_id ON audit_logs(operator_id);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_action_type ON audit_logs(action_type);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs(created_at);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_business_module ON audit_logs(business_module);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_operation_result ON audit_logs(operation_result);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_api_endpoint ON audit_logs(api_endpoint);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_operator_time ON audit_logs(operator_id, created_at DESC);
 
 -- 新股申购索引
-CREATE INDEX idx_ipo_applications_user_id ON ipo_applications(user_id);
-CREATE INDEX idx_ipo_applications_ipo_code ON ipo_applications(ipo_code);
+CREATE INDEX IF NOT EXISTS idx_ipo_applications_user_id ON ipo_applications(user_id);
+CREATE INDEX IF NOT EXISTS idx_ipo_applications_ipo_code ON ipo_applications(ipo_code);
 
 -- 管理员索引
-CREATE INDEX idx_admins_username ON admins(username);
-CREATE INDEX idx_admins_role ON admins(role);
+CREATE INDEX IF NOT EXISTS idx_admins_username ON admins(username);
+CREATE INDEX IF NOT EXISTS idx_admins_role ON admins(role);
 
 -- 机构表索引
-CREATE INDEX idx_organizations_name ON organizations(name);
-CREATE INDEX idx_organizations_status ON organizations(status);
+CREATE INDEX IF NOT EXISTS idx_organizations_name ON organizations(name);
+CREATE INDEX IF NOT EXISTS idx_organizations_status ON organizations(status);
 
 -- 邀请码表索引
-CREATE INDEX idx_invitation_codes_code ON invitation_codes(code);
-CREATE INDEX idx_invitation_codes_organization ON invitation_codes(organization_id);
-CREATE INDEX idx_invitation_codes_status ON invitation_codes(status);
-CREATE INDEX idx_invitation_codes_expires ON invitation_codes(expires_at);
+CREATE INDEX IF NOT EXISTS idx_invitation_codes_code ON invitation_codes(code);
+CREATE INDEX IF NOT EXISTS idx_invitation_codes_organization ON invitation_codes(organization_id);
+CREATE INDEX IF NOT EXISTS idx_invitation_codes_status ON invitation_codes(status);
+CREATE INDEX IF NOT EXISTS idx_invitation_codes_expires ON invitation_codes(expires_at);
 
 -- 系统消息表索引
-CREATE INDEX idx_system_messages_user_id ON system_messages(user_id);
-CREATE INDEX idx_system_messages_type ON system_messages(type);
-CREATE INDEX idx_system_messages_sent_at ON system_messages(sent_at);
-CREATE INDEX idx_system_messages_read ON system_messages(read);
+CREATE INDEX IF NOT EXISTS idx_system_messages_user_id ON system_messages(user_id);
+CREATE INDEX IF NOT EXISTS idx_system_messages_type ON system_messages(type);
+CREATE INDEX IF NOT EXISTS idx_system_messages_sent_at ON system_messages(sent_at);
+CREATE INDEX IF NOT EXISTS idx_system_messages_read ON system_messages(read);
 
 -- 消息模板表索引
-CREATE INDEX idx_message_templates_type ON message_templates(type);
+CREATE INDEX IF NOT EXISTS idx_message_templates_type ON message_templates(type);
 
--- 插入默认管理员账号 (密码: admin123456)
-INSERT INTO admins (username, password_hash, role) 
-VALUES ('admin', '$2a$10$YourHashedPasswordHere', 'super_admin')
+-- 插入默认系统管理员：用户名 admin，密码 admin123456（首次登录后请修改）
+INSERT INTO admins (username, password_hash, role, status) 
+VALUES ('admin', '$2b$10$jz7w9.tQjrtYwGssZkWYzO6EsehZGRcF9X5WQeUS7/RQn5EkeO/02', 'super_admin', 'active')
 ON CONFLICT (username) DO NOTHING;
 
 -- 插入默认全局配置
@@ -322,6 +333,7 @@ ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ipo_applications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE admins ENABLE ROW LEVEL SECURITY;
 ALTER TABLE global_config ENABLE ROW LEVEL SECURITY;
+ALTER TABLE system_configs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE organizations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE invitation_codes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE system_messages ENABLE ROW LEVEL SECURITY;

@@ -110,10 +110,15 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { action, userId, data, adminId, adminName } = body;
+    const { action, userId, data } = body;
 
-    if (!action || !userId || !adminId || !adminName) {
-      return NextResponse.json({ success: false, error: '缺少必要参数' }, { status: 400 });
+    if (!action) {
+      return NextResponse.json({ success: false, error: '缺少操作类型' }, { status: 400 });
+    }
+    
+    // 对于创建操作，不需要userId
+    if (action !== 'create' && !userId) {
+      return NextResponse.json({ success: false, error: '缺少用户ID' }, { status: 400 });
     }
 
     if (!supabase) {
@@ -121,9 +126,10 @@ export async function POST(req: NextRequest) {
     }
 
     let result;
+    let newUserId = null;
     let auditData: any = {
-      admin_id: adminId,
-      admin_name: adminName,
+      admin_id: admin.id,
+      admin_name: admin.username,
       action: `user_${action}`,
       target_type: 'user',
       target_id: userId,
@@ -226,6 +232,52 @@ export async function POST(req: NextRequest) {
         auditData.description = `调整用户${currency}资金: ${amount > 0 ? '+' : ''}${amount}`;
         break;
 
+      case 'create':
+        // 创建新用户
+        const { data: userData } = body;
+        
+        if (!userData || !userData.username || !userData.password) {
+          return NextResponse.json({ success: false, error: '缺少必要参数' }, { status: 400 });
+        }
+        
+        // 检查用户名是否已存在
+        const { data: existingUser } = await supabase
+          .from('users')
+          .select('id')
+          .eq('username', userData.username)
+          .single();
+        
+        if (existingUser) {
+          return NextResponse.json({ success: false, error: '用户名已存在' }, { status: 400 });
+        }
+        
+        // 加密密码
+        const bcrypt = require('bcryptjs');
+        const hashedPassword = await bcrypt.hash(userData.password, 10);
+        
+        // 准备用户数据
+        const newUser = {
+          username: userData.username,
+          real_name: userData.real_name || '',
+          phone: userData.phone || '',
+          email: userData.email || null,
+          id_card: userData.id_card || null,
+          password_hash: hashedPassword,
+          organization_id: userData.organization_id || null,
+          status: userData.status || 'pending',
+          created_at: new Date().toISOString()
+        };
+        
+        // 创建用户
+        result = await supabase
+          .from('users')
+          .insert([newUser]);
+        
+        auditData.description = '创建新用户';
+        newUserId = result.data?.[0]?.id || null;
+        auditData.target_id = newUserId;
+        break;
+        
       default:
         return NextResponse.json({ success: false, error: '不支持的操作类型' }, { status: 400 });
     }
@@ -238,7 +290,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       message: `用户操作成功: ${action}`,
-      data: { userId, action }
+      data: { 
+        userId: action === 'create' ? newUserId : userId, 
+        action 
+      }
     });
   } catch (error: any) {
     console.error('用户管理操作错误:', error);
