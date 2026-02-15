@@ -1,59 +1,58 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { approveOrder, getPendingOrders } from '@/lib/order-service';
-import { tradeAuditRules, validate } from '@/lib/validation';
+
+/**
+ * @deprecated 旧版交易审核API，已废弃
+ * 请使用新版统一管理API：/api/admin/trade
+ * 废弃原因：新版API提供更统一的接口、更好的权限控制和更完善的审计日志
+ */
 
 export async function GET(req: NextRequest) {
-  try {
-    const { searchParams } = new URL(req.url);
-    const tradeType = searchParams.get('trade_type') || undefined;
-    const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '20');
-    
-    const result = await getPendingOrders(tradeType, page, limit);
-    return NextResponse.json({ 
-      success: true, 
-      data: result.data,
-      pagination: {
-        page,
-        limit,
-        total: result.total,
-        pages: Math.ceil(result.total / limit)
-      }
-    });
-  } catch (error: any) {
-    console.error('GET /api/trade error:', error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
-  }
+  console.warn('DEPRECATED: 旧版 /api/trade API被调用，请迁移到 /api/admin/trade');
+  
+  return NextResponse.json({
+    success: false,
+    error: 'API已废弃',
+    message: '此API已废弃，请使用新版统一管理API：/api/admin/trade',
+    migration_guide: {
+      new_endpoint: '/api/admin/trade',
+      parameter_changes: {
+        old: 'trade_type=a-share',
+        new: 'type=a_share'
+      },
+      authentication: '需要管理员权限和Bearer Token',
+      documentation: '请参考新版API文档'
+    }
+  }, { status: 410 }); // 410 Gone - 资源已永久移除
 }
 
 export async function POST(req: NextRequest) {
-  try {
-    const body = await req.json();
-    
-    // Validate parameters
-    const validation = validate(body, tradeAuditRules);
-    if (!validation.valid) {
-      const errorMessage = validation.errors.map(e => `${e.field}: ${e.message}`).join('; ');
-      console.error('Trade audit validation failed:', errorMessage);
-      return NextResponse.json(
-        { success: false, error: `参数验证失败: ${errorMessage}` },
-        { status: 400 }
-      );
+  console.warn('DEPRECATED: 旧版 /api/trade API被调用，请迁移到 /api/admin/trade');
+  
+  return NextResponse.json({
+    success: false,
+    error: 'API已废弃',
+    message: '此API已废弃，请使用新版统一管理API：/api/admin/trade',
+    migration_guide: {
+      new_endpoint: '/api/admin/trade',
+      parameter_changes: {
+        old: {
+          orderId: '订单ID',
+          action: '操作类型',
+          adminId: '管理员ID',
+          adminName: '管理员名称',
+          reason: '原因'
+        },
+        new: {
+          targetId: '目标ID',
+          action: '操作类型 (approve/reject/cancel)',
+          targetType: '目标类型 (order/block_order/ipo_application等)',
+          adminId: '管理员ID',
+          adminName: '管理员名称',
+          reason: '原因'
+        }
+      },
+      authentication: '需要管理员权限和Bearer Token',
+      documentation: '请参考新版API文档'
     }
-    
-    const { orderId, action, adminId, adminName, reason } = body;
-    
-    // Log the operation
-    console.log(`审核订单 ID: ${orderId}, 操作: ${action}, 管理员: ${adminName} (${adminId}), 理由: ${reason || '无'}`);
-    
-    await approveOrder(orderId, adminId, adminName, action, reason);
-    
-    // Log success
-    console.log(`订单审核成功 ID: ${orderId}, 状态更新为: ${action}`);
-    
-    return NextResponse.json({ success: true });
-  } catch (error: any) {
-    console.error('POST /api/trade error:', error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
-  }
+  }, { status: 410 }); // 410 Gone - 资源已永久移除
 }
