@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { verifyAdminAuth } from '@/lib/auth';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * 统一管理端交易API
  * 支持所有交易类型的审核管理
@@ -186,17 +188,26 @@ export async function GET(req: NextRequest) {
         break;
 
       default:
-        // 如果没有指定类型，返回所有类型的待审核记录（前20条）
-        // 这里简化处理，实际可能需要更复杂的逻辑
-        const { data: allOrders } = await supabase
+        // 未指定 type 时返回 orders 表：status=all 为全部状态，否则为待审核
+        let allOrdersQuery = supabase
           .from('orders')
-          .select('*, users(username, real_name, phone)')
-          .eq('status', 'pending')
-          .order('created_at', { ascending: false })
-          .limit(limit);
+          .select('*, users(username, real_name, phone)', { count: 'exact' })
+          .order('created_at', { ascending: false });
+
+        if (status !== 'all') {
+          allOrdersQuery = allOrdersQuery.eq('status', status || 'pending');
+        }
+        if (userId) {
+          allOrdersQuery = allOrdersQuery.eq('user_id', userId);
+        }
+
+        const rangeFrom = (page - 1) * limit;
+        const rangeTo = rangeFrom + limit - 1;
+        const { data: allOrders, count: allCount, error: allError } = await allOrdersQuery.range(rangeFrom, rangeTo);
+        if (allError) throw allError;
 
         result = allOrders || [];
-        total = result.length;
+        total = allCount || 0;
         break;
     }
 

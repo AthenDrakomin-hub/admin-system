@@ -155,19 +155,19 @@ export const mapCurrency = (chineseCurrency: string): Currency => {
  * Specific API methods for common operations
  */
 
-// Trade APIs
+// Trade APIs（管理端请使用 adminApi 或 /api/admin/trade）
 export const tradeApi = {
-  // Get pending orders
-  getPendingOrders: (tradeType?: string, page = 1, limit = 20) => 
-    request('/api/trade', {
-      params: { trade_type: tradeType, page, limit },
+  // 获取待审核订单（需管理员 token）
+  getPendingOrders: (tradeType?: string, page = 1, limit = 20) =>
+    request('/api/admin/trade', {
+      params: { type: tradeType, status: 'pending', page, limit },
     }),
 
-  // Audit order
+  // 审核订单（需管理员 token）
   auditOrder: (orderId: string, action: AuditAction, adminId: string, adminName: string, reason?: string) =>
-    request('/api/trade', {
+    request('/api/admin/trade', {
       method: 'POST',
-      body: JSON.stringify({ orderId, action, adminId, adminName, reason }),
+      body: JSON.stringify({ action, targetType: 'order', targetId: orderId, adminId, adminName, reason }),
     }),
 };
 

@@ -1,6 +1,8 @@
 import { NextRequest } from 'next/server';
 import { clientResponse, clientError } from '@/lib/client';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * 客户端用户API - 代理到统一用户API
  * 保持向后兼容性

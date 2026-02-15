@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { verifyAdminAuth } from '@/lib/auth';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * 管理端数据导出API
  * 支持多种格式的数据导出功能

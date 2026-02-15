@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { FileText, RefreshCw } from "lucide-react";
+import { adminApiFetch } from "@/lib/admin-api";
 
 export default function OrderManagePage() {
   const [orders, setOrders] = useState<any[]>([]);
@@ -10,8 +11,7 @@ export default function OrderManagePage() {
   const fetchOrders = async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/trade?status=all');
-      const data = await res.json();
+      const data = await adminApiFetch('/api/admin/trade?status=all');
       if (data.success) setOrders(data.data || []);
     } catch (err) {
       console.error(err);
