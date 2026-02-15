@@ -2,6 +2,9 @@ import { NextRequest } from 'next/server';
 import { clientResponse, clientError } from '@/lib/client';
 import { getStockQuote, searchStocks, getKlineData, getMarketIndices } from '@/lib/market';
 
+// 核心修复：强制该API路由动态渲染，避免静态生成时的错误
+export const dynamic = 'force-dynamic';
+
 /**
  * 行情API
  * GET /api/client/market?action=quote&symbol=000001
@@ -11,7 +14,8 @@ import { getStockQuote, searchStocks, getKlineData, getMarketIndices } from '@/l
  */
 export async function GET(req: NextRequest) {
   try {
-    const { searchParams } = req.nextUrl;
+    // 使用标准的URL解析方式替代nextUrl（更兼容）
+    const { searchParams } = new URL(req.url);
     const action = searchParams.get('action') || 'quote';
     const symbol = searchParams.get('symbol') || '';
     const keyword = searchParams.get('keyword') || '';

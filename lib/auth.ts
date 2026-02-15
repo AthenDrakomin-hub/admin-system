@@ -1,8 +1,9 @@
-import jwt from 'jsonwebtoken';
+import { jwtVerify, SignJWT } from 'jose';
 import { supabase } from './supabase';
 import { AdminUser, AdminRole, getPermissions } from '@/types/admin';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+const secretKey = new TextEncoder().encode(JWT_SECRET);
 
 export interface AuthUser {
   username: string;
@@ -17,23 +18,23 @@ export interface ClientUser {
 /**
  * 生成JWT Token
  */
-export function generateToken(user: AuthUser): string {
-  return jwt.sign(
-    { username: user.username, role: user.role },
-    JWT_SECRET,
-    { expiresIn: '7d' }
-  );
+export async function generateToken(user: AuthUser): Promise<string> {
+  return new SignJWT({ username: user.username, role: user.role })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuedAt()
+    .setExpirationTime('7d')
+    .sign(secretKey);
 }
 
 /**
  * 生成客户端用户JWT Token
  */
-export function generateClientToken(user: ClientUser): string {
-  return jwt.sign(
-    { username: user.username, role: user.role },
-    JWT_SECRET,
-    { expiresIn: '7d' }
-  );
+export async function generateClientToken(user: ClientUser): Promise<string> {
+  return new SignJWT({ username: user.username, role: user.role })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuedAt()
+    .setExpirationTime('7d')
+    .sign(secretKey);
 }
 
 /**
@@ -43,7 +44,8 @@ export async function verifyAuth(token: string): Promise<AuthUser | null> {
   try {
     console.log('verifyAuth - JWT_SECRET:', JWT_SECRET ? 'exists' : 'missing');
     console.log('verifyAuth - token:', token.substring(0, 20) + '...');
-    const decoded = jwt.verify(token, JWT_SECRET) as AuthUser;
+    const { payload } = await jwtVerify(token, secretKey);
+    const decoded = payload as unknown as AuthUser;
     console.log('verifyAuth - decoded:', decoded);
     return decoded;
   } catch (error) {
@@ -58,7 +60,8 @@ export async function verifyAuth(token: string): Promise<AuthUser | null> {
 export async function verifyAdminAuth(token: string): Promise<AdminUser | null> {
   try {
     // 验证JWT token
-    const decoded = jwt.verify(token, JWT_SECRET) as { username: string; role: AdminRole };
+    const { payload } = await jwtVerify(token, secretKey);
+    const decoded = payload as unknown as { username: string; role: AdminRole };
     
     if (!decoded || !decoded.username) {
       return null;
@@ -102,10 +105,10 @@ export async function verifyAdminAuth(token: string): Promise<AdminUser | null> 
 /**
  * 生成管理员JWT Token
  */
-export function generateAdminToken(admin: { username: string; role: AdminRole }): string {
-  return jwt.sign(
-    { username: admin.username, role: admin.role },
-    JWT_SECRET,
-    { expiresIn: '24h' } // 管理员token有效期更短
-  );
+export async function generateAdminToken(admin: { username: string; role: AdminRole }): Promise<string> {
+  return new SignJWT({ username: admin.username, role: admin.role })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuedAt()
+    .setExpirationTime('24h') // 管理员token有效期更短
+    .sign(secretKey);
 }

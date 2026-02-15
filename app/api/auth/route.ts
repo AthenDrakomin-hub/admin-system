@@ -69,7 +69,7 @@ export async function POST(req: NextRequest) {
 
     // 生成Token
     console.log('生成Token...');
-    const token = generateToken({
+    const token = await generateToken({
       username: admin.username,
       role: admin.role
     });

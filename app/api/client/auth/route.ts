@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 生成Token
-    const token = generateClientToken({
+    const token = await generateClientToken({
       username: user.username,
       role: 'user' // 客户端用户角色
     });
