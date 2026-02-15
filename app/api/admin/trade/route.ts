@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
     }
 
     // 检查交易审核权限
-    if (!admin.permissions.canApproveTrades) {
+    if (!admin.permissions?.canApproveTrades) {
       return NextResponse.json({ success: false, error: '无交易审核权限' }, { status: 403 });
     }
 

@@ -9,10 +9,26 @@ export interface AuthUser {
   role: 'super_admin' | 'admin';
 }
 
+export interface ClientUser {
+  username: string;
+  role: 'user';
+}
+
 /**
  * 生成JWT Token
  */
 export function generateToken(user: AuthUser): string {
+  return jwt.sign(
+    { username: user.username, role: user.role },
+    JWT_SECRET,
+    { expiresIn: '7d' }
+  );
+}
+
+/**
+ * 生成客户端用户JWT Token
+ */
+export function generateClientToken(user: ClientUser): string {
   return jwt.sign(
     { username: user.username, role: user.role },
     JWT_SECRET,
@@ -49,6 +65,11 @@ export async function verifyAdminAuth(token: string): Promise<AdminUser | null> 
     }
 
     // 从数据库查询管理员信息
+    if (!supabase) {
+      console.error('数据库未配置');
+      return null;
+    }
+    
     const { data: adminData, error } = await supabase
       .from('admins')
       .select('*')

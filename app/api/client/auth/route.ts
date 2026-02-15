@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { clientResponse, clientError } from '@/lib/client';
-import { generateToken, verifyAuth } from '@/lib/auth';
+import { generateClientToken, verifyAuth } from '@/lib/auth';
 import { createClient } from '@supabase/supabase-js';
 import bcrypt from 'bcryptjs';
 
@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 生成Token
-    const token = generateToken({
+    const token = generateClientToken({
       username: user.username,
       role: 'user' // 客户端用户角色
     });

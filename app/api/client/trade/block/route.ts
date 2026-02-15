@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 检查大宗交易资格
-    const matchResult = matchBlockTrade({ price, quantity, discountRate }, 10000); // 最小成交量10000股
+    const matchResult = matchBlockTrade({ price, quantity, discount_rate: discountRate }, 10000); // 最小成交量10000股
     
     if (!matchResult.matched) {
       return clientError(matchResult.reason || '不符合大宗交易条件');

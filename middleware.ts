@@ -66,13 +66,8 @@ export async function middleware(request: NextRequest) {
       );
     }
     
-    // 检查管理员状态
-    if (admin.role === 'disabled') {
-      return NextResponse.json(
-        { success: false, error: '管理员账号已禁用' },
-        { status: 403 }
-      );
-    }
+    // 检查管理员状态（已经在verifyAdminAuth中检查了status === 'active'）
+    // 如果能到这里，说明管理员状态正常
     
     // 根据API路径检查具体权限
     const action = getActionFromMethod(request.method);

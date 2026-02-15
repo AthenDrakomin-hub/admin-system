@@ -46,7 +46,7 @@ export async function GET(req: NextRequest) {
     switch (module) {
       case 'audit': // 审核中心 - 待审核用户列表
         // 检查权限
-        if (!admin.permissions.canManageUsers) {
+        if (!admin.permissions?.canManageUsers) {
           return NextResponse.json({ success: false, error: '无用户管理权限' }, { status: 403 });
         }
 
@@ -78,7 +78,7 @@ export async function GET(req: NextRequest) {
 
       case 'invite': // 邀请码列表
         // 检查权限
-        if (!admin.permissions.canManageUsers) {
+        if (!admin.permissions?.canManageUsers) {
           return NextResponse.json({ success: false, error: '无用户管理权限' }, { status: 403 });
         }
 
@@ -106,7 +106,7 @@ export async function GET(req: NextRequest) {
 
       case 'user': // 用户列表
         // 检查权限
-        if (!admin.permissions.canManageUsers) {
+        if (!admin.permissions?.canManageUsers) {
           return NextResponse.json({ success: false, error: '无用户管理权限' }, { status: 403 });
         }
 
@@ -140,7 +140,7 @@ export async function GET(req: NextRequest) {
 
       case 'message': // 站内信记录
         // 检查权限
-        if (!admin.permissions.canManageUsers) {
+        if (!admin.permissions?.canManageUsers) {
           return NextResponse.json({ success: false, error: '无用户管理权限' }, { status: 403 });
         }
 
@@ -226,13 +226,14 @@ export async function POST(req: NextRequest) {
       target_type: module,
       target_id: targetId,
       reason: data?.reason || null,
+      description: '',
       created_at: new Date().toISOString()
     };
 
     // 根据模块和操作执行不同的逻辑
     switch (module) {
       case 'audit': // 用户审核
-        if (!admin.permissions.canManageUsers) {
+        if (!admin.permissions?.canManageUsers) {
           return NextResponse.json({ success: false, error: '无用户管理权限' }, { status: 403 });
         }
 
@@ -280,7 +281,7 @@ export async function POST(req: NextRequest) {
         break;
 
       case 'invite': // 邀请码管理
-        if (!admin.permissions.canManageUsers) {
+        if (!admin.permissions?.canManageUsers) {
           return NextResponse.json({ success: false, error: '无用户管理权限' }, { status: 403 });
         }
 
@@ -334,7 +335,7 @@ export async function POST(req: NextRequest) {
         break;
 
       case 'user': // 用户管理
-        if (!admin.permissions.canManageUsers) {
+        if (!admin.permissions?.canManageUsers) {
           return NextResponse.json({ success: false, error: '无用户管理权限' }, { status: 403 });
         }
 
@@ -392,7 +393,7 @@ export async function POST(req: NextRequest) {
         break;
 
       case 'message': // 站内信管理
-        if (!admin.permissions.canManageUsers) {
+        if (!admin.permissions?.canManageUsers) {
           return NextResponse.json({ success: false, error: '无用户管理权限' }, { status: 403 });
         }
 
@@ -483,4 +484,3 @@ function generateRandomPassword(length: number = 12): string {
   }
   return result;
 }
-</fitten_content>

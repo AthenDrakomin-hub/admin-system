@@ -217,14 +217,25 @@ export async function PUT(req: NextRequest) {
       return clientError('无效的认证信息', 401);
     }
 
+    if (!supabase) {
+      return clientError('Database not configured');
+    }
+
+    // 获取用户完整信息
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .select('id, username, balance_cny')
+      .eq('username', authUser.username)
+      .single();
+
+    if (userError || !user) {
+      return clientError('用户不存在', 404);
+    }
+
     const { strategyId } = await req.json();
     
     if (!strategyId) {
       return clientError('缺少策略ID');
-    }
-
-    if (!supabase) {
-      return clientError('Database not configured');
     }
 
     // 查询策略信息
@@ -239,7 +250,7 @@ export async function PUT(req: NextRequest) {
     }
 
     // 验证策略所属用户
-    if (strategy.user_id !== authUser.id) {
+    if (strategy.user_id !== user.id) {
       return clientError('无权操作此策略', 403);
     }
 
