@@ -28,7 +28,7 @@ export default function LoginPage() {
 
       console.log('响应状态:', res.status);
       const data = await res.json();
-      console.log('响应数据:', data);
+      console.log('完整响应数据:', data);
 
       if (!res.ok) {
         setError(data.error || "登录失败");
@@ -36,16 +36,35 @@ export default function LoginPage() {
         return;
       }
 
+      // 核心修复：匹配后端返回的数据结构
+      // 后端返回格式: { success: true, data: { token: "...", user: { id, username, role } } }
+      if (!data.success) {
+        setError(data.error || "登录失败");
+        setLoading(false);
+        return;
+      }
+
+      // 使用可选链操作符避免undefined错误
+      const token = data.data?.token;
+      const user = data.data?.user;
+      
+      if (!token || !user) {
+        console.error('响应数据不完整:', { token, user });
+        setError("登录响应数据不完整");
+        setLoading(false);
+        return;
+      }
+
       // 存储token和用户信息
       const expires = new Date();
       expires.setDate(expires.getDate() + 7);
-      document.cookie = `admin_token=${data.token}; path=/; expires=${expires.toUTCString()}; SameSite=Lax`;
-      localStorage.setItem("token", data.token);
-      localStorage.setItem("adminId", data.user.username); // 保存adminId
-      localStorage.setItem("adminName", data.user.username); // 保存adminName
-      localStorage.setItem("adminRole", data.user.role); // 保存角色
+      document.cookie = `admin_token=${token}; path=/; expires=${expires.toUTCString()}; SameSite=Lax`;
+      localStorage.setItem("token", token);
+      localStorage.setItem("adminId", user.id); // 保存adminId
+      localStorage.setItem("adminName", user.username); // 保存adminName
+      localStorage.setItem("adminRole", user.role); // 保存角色
       
-      console.log('登录成功，跳转中...');
+      console.log('登录成功，用户信息:', user);
       console.log('Cookie已设置:', document.cookie);
       window.location.href = '/admin/dashboard';
     } catch (err) {
