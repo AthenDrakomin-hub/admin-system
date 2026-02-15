@@ -36,18 +36,19 @@ export async function POST(req: NextRequest) {
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // 查询管理员
+    // 查询管理员（仅允许 status=active 的账号登录，与 verifyAdminAuth 一致）
     console.log('查询管理员:', username);
     const { data: admin, error } = await supabase
       .from('admins')
-      .select('username, password_hash, role')
+      .select('username, password_hash, role, status')
       .eq('username', username)
+      .eq('status', 'active')
       .single();
 
     console.log('查询结果:', { admin: !!admin, error: error?.message });
 
     if (error || !admin) {
-      console.log('管理员不存在或查询错误:', error?.message);
+      console.log('管理员不存在、已禁用或查询错误:', error?.message);
       return NextResponse.json(
         { success: false, error: '用户名或密码错误' },
         { status: 401 }
