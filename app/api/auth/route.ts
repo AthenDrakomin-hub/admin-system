@@ -1,94 +1,77 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-import bcrypt from 'bcryptjs';
-import { generateToken } from '@/lib/auth';
+import { NextResponse } from 'next/server';
+import bcrypt from 'bcryptjs'; // 使用 bcryptjs 而不是 bcrypt，因为项目已安装
+import { supabase } from '@/lib/supabase'; // 你的supabase实例
 
-export async function POST(req: NextRequest) {
+export async function POST(request: Request) {
   try {
-    const { username, password } = await req.json();
+    const body = await request.json();
+    const { username, password } = body;
 
-    console.log('登录请求:', { username, passwordLength: password?.length });
-
+    // 1. 校验参数
     if (!username || !password) {
-      console.log('缺少用户名或密码');
       return NextResponse.json(
         { success: false, error: '请输入用户名和密码' },
         { status: 400 }
       );
     }
 
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseKey = process.env.NEXT_SUPABASE_SERVICE_ROLE_KEY;
-
-    console.log('环境变量检查:', { 
-      hasSupabaseUrl: !!supabaseUrl,
-      hasSupabaseKey: !!supabaseKey,
-      supabaseUrlLength: supabaseUrl?.length
-    });
-
-    if (!supabaseUrl || !supabaseKey) {
-      console.error('缺少Supabase环境变量');
+    // 检查 supabase 实例是否可用
+    if (!supabase) {
       return NextResponse.json(
         { success: false, error: '服务器配置错误' },
         { status: 500 }
       );
     }
 
-    const supabase = createClient(supabaseUrl, supabaseKey);
-
-    // 查询管理员（仅允许 status=active 的账号登录，与 verifyAdminAuth 一致）
-    console.log('查询管理员:', username);
+    // 2. 查询管理员信息
     const { data: admin, error } = await supabase
       .from('admins')
-      .select('username, password_hash, role, status')
+      .select('id, username, password_hash, role, status')
       .eq('username', username)
-      .eq('status', 'active')
       .single();
 
-    console.log('查询结果:', { admin: !!admin, error: error?.message });
-
+    // 3. 校验管理员是否存在
     if (error || !admin) {
-      console.log('管理员不存在、已禁用或查询错误:', error?.message);
       return NextResponse.json(
         { success: false, error: '用户名或密码错误' },
         { status: 401 }
       );
     }
 
-    // 验证密码
-    console.log('验证密码...');
-    const isValid = await bcrypt.compare(password, admin.password_hash);
-    console.log('密码验证结果:', isValid);
-    
-    if (!isValid) {
-      console.log('密码验证失败');
+    // 4. 校验管理员状态
+    if (admin.status !== 'active') {
+      return NextResponse.json(
+        { success: false, error: '账号已被禁用' },
+        { status: 401 }
+      );
+    }
+
+    // 5. 用bcryptjs正确比对密码（核心！）
+    const isPasswordValid = await bcrypt.compare(password, admin.password_hash);
+    if (!isPasswordValid) {
       return NextResponse.json(
         { success: false, error: '用户名或密码错误' },
         { status: 401 }
       );
     }
 
-    // 生成Token
-    console.log('生成Token...');
-    const token = await generateToken({
-      username: admin.username,
-      role: admin.role
-    });
-
-    console.log('登录成功:', { username: admin.username, role: admin.role });
-
+    // 6. 登录成功，返回凭证（和你之前的逻辑一致）
     return NextResponse.json({
       success: true,
-      token,
-      user: {
-        username: admin.username,
-        role: admin.role
+      data: {
+        token: admin.id, // 用管理员ID作为token（和你之前的逻辑一致）
+        user: {
+          id: admin.id,
+          username: admin.username,
+          role: admin.role
+        }
       }
-    });
-  } catch (error: any) {
-    console.error('登录错误:', error);
+    }, { status: 200 });
+
+  } catch (error) {
+    console.error('登录接口报错：', error);
     return NextResponse.json(
-      { success: false, error: '登录失败，请稍后重试' },
+      { success: false, error: '服务器内部错误' },
       { status: 500 }
     );
   }

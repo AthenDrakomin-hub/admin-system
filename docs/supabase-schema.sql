@@ -292,7 +292,7 @@ CREATE INDEX IF NOT EXISTS idx_message_templates_type ON message_templates(type)
 
 -- 插入默认系统管理员：用户名 admin，密码 admin123456（首次登录后请修改）
 INSERT INTO admins (username, password_hash, role, status) 
-VALUES ('admin', '$2b$10$jz7w9.tQjrtYwGssZkWYzO6EsehZGRcF9X5WQeUS7/RQn5EkeO/02', 'super_admin', 'active')
+VALUES ('admin', '$2b$10$cnZ4dnGlW.FdiM5JNDx9nO5ebbS8EcQGWWDWQ0j24GpBOsp7SGDum', 'super_admin', 'active')
 ON CONFLICT (username) DO NOTHING;
 
 -- 插入默认全局配置
