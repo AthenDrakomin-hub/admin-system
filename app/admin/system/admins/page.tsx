@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Shield, RefreshCw } from "lucide-react";
+import { getAdminAuthHeaders } from "@/lib/admin-api";
 
 export default function AdminManagePage() {
   const [admins, setAdmins] = useState<any[]>([]);
@@ -10,9 +11,10 @@ export default function AdminManagePage() {
   const fetchAdmins = async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/system?action=admins');
+      const headers = getAdminAuthHeaders();
+      const res = await fetch('/api/admin/management?module=admin', { headers });
       const data = await res.json();
-      if (data.success) setAdmins(data.data || []);
+      if (data.success || data.data) setAdmins(data.data || []);
     } catch (err) {
       console.error(err);
     } finally {

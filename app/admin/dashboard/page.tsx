@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { 
   Bell, 
   TrendingUp, 
@@ -12,7 +12,7 @@ import {
   Users
 } from "lucide-react";
 import Link from "next/link";
-import { usePolling } from "@/lib/use-polling";
+import { adminApi } from "@/lib/admin-api";
 
 interface DashboardStats {
   pendingTrades: number;
@@ -26,14 +26,42 @@ interface DashboardStats {
 }
 
 export default function DashboardPage() {
-  const { data: stats, loading } = usePolling<DashboardStats>(
-    async () => {
-      const res = await fetch('/api/dashboard/stats');
-      const json = await res.json();
-      return json.data;
-    },
-    { interval: 30000 }
-  );
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // 获取实时监控数据
+  const fetchStats = async () => {
+    try {
+      const data = await adminApi.monitor.realtime();
+      
+      // 从实时数据中提取需要的信息
+      const orders = data.data?.orders || {};
+      const users = data.data?.users || {};
+      const market = data.data?.market || {};
+      
+      setStats({
+        pendingTrades: orders.pending || 0,
+        pendingWithdraws: 0,  // 需要从财务模块获取
+        pendingRecharges: 0,  // 需要从财务模块获取
+        abnormalOrders: market.active_alerts || 0,
+        todayTrades: orders.today_total || 0,
+        todayAmount: 0,  // 需要计算
+        activeUsers: users.online || 0,
+        timestamp: data.data?.timestamp
+      });
+    } catch (err) {
+      console.error('获取监控数据失败:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchStats();
+    // 设置定时刷新，每30秒刷新一次
+    const interval = setInterval(fetchStats, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   const displayStats = stats || {
     pendingTrades: 0,

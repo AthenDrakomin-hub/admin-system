@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { User } from "lucide-react";
+import { adminApi } from "@/lib/admin-api";
 
 function UserDetailContent() {
   const searchParams = useSearchParams();
@@ -19,8 +20,7 @@ function UserDetailContent() {
   const fetchUser = async () => {
     try {
       setLoading(true);
-      const res = await fetch(`/api/user?userId=${userId}`);
-      const data = await res.json();
+      const data = await adminApi.users.get(userId!);
       if (data.success && data.data?.length > 0) {
         setUser(data.data[0]);
       }

@@ -20,7 +20,9 @@ export async function GET(req: NextRequest) {
     }
 
     const token = authHeader.substring(7);
+    console.log('GET /api/admin/management - 验证token:', token.substring(0, 20) + '...');
     const admin = await verifyAdminAuth(token);
+    console.log('GET /api/admin/management - 验证结果:', admin);
 
     if (!admin) {
       return NextResponse.json({ success: false, error: '无效的管理员认证' }, { status: 401 });

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Package, RefreshCw } from "lucide-react";
+import { getAdminAuthHeaders } from "@/lib/admin-api";
 
 export default function PositionManagePage() {
   const [positions, setPositions] = useState<any[]>([]);
@@ -10,9 +11,10 @@ export default function PositionManagePage() {
   const fetchPositions = async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/user?action=positions');
+      const headers = getAdminAuthHeaders();
+      const res = await fetch('/api/admin/users?action=positions', { headers });
       const data = await res.json();
-      if (data.success) setPositions(data.data || []);
+      if (data.success || data.data) setPositions(data.data || []);
     } catch (err) {
       console.error(err);
     } finally {

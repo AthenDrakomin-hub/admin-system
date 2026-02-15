@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Send, RefreshCw, X } from "lucide-react";
+import { adminApi, getAdminInfo } from "@/lib/admin-api";
 
 interface Message {
   id: string;
@@ -38,9 +39,8 @@ export default function UserMessagesPage() {
   const fetchMessages = async () => {
     try {
       setLoading(true);
-      const res = await fetch("/api/user/messages");
-      const data = await res.json();
-      if (data.success) setMessages(data.data || []);
+      const data = await adminApi.messages.list();
+      setMessages(data.data || []);
     } catch (err) {
       console.error(err);
     } finally {
@@ -50,42 +50,34 @@ export default function UserMessagesPage() {
 
   const fetchUsers = async () => {
     try {
-      const res = await fetch("/api/user");
-      const data = await res.json();
-      if (data.success) setUsers(data.data || []);
+      const data = await adminApi.users.list();
+      setUsers(data.data || []);
     } catch (err) {
       console.error(err);
     }
   };
 
   const handleSend = async () => {
+    const adminInfo = getAdminInfo();
+    
     if (!selectedUsers.length || !form.title || !form.content) {
       alert("请填写所有必要信息");
       return;
     }
 
     try {
-      const res = await fetch("/api/user/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userIds: selectedUsers,
-          title: form.title,
-          content: form.content,
-          type: form.type,
-        }),
-      });
-
-      const data = await res.json();
-      if (data.success) {
-        alert("消息已发送");
-        setShowForm(false);
-        setSelectedUsers([]);
-        setForm({ title: "", content: "", type: "notification" });
-        fetchMessages();
+      // 使用批量发送消息API
+      for (const userId of selectedUsers) {
+        await adminApi.messages.send(userId, form.title, form.content, form.type);
       }
-    } catch (err) {
-      alert("发送失败");
+      
+      alert("消息已发送");
+      setShowForm(false);
+      setSelectedUsers([]);
+      setForm({ title: "", content: "", type: "notification" });
+      fetchMessages();
+    } catch (err: any) {
+      alert(err.message || '发送失败');
     }
   };
 

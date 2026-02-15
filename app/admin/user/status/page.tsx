@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Lock, Unlock, FileCheck, X, RefreshCw } from "lucide-react";
+import { adminApi, getAdminInfo } from "@/lib/admin-api";
 
 interface UserStatus {
   id: string;
@@ -26,42 +27,56 @@ export default function UserStatusPage() {
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      const res = await fetch("/api/user/status");
-      const data = await res.json();
-      if (data.success) setUsers(data.data || []);
-    } catch (err) {
+      const data = await adminApi.users.list({ status: 'all' });
+      setUsers(data.data || []);
+    } catch (err: any) {
       console.error(err);
+      alert(err.message || '获取用户列表失败');
     } finally {
       setLoading(false);
     }
   };
 
   const handleAction = async (userId: string, act: string) => {
+    const adminInfo = getAdminInfo();
+    
     try {
-      const res = await fetch("/api/user/status", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId,
-          action: act,
-          reason,
-          adminId: "admin_id",
-          adminName: "管理员",
-        }),
-      });
-
-      const data = await res.json();
-      if (data.success) {
-        alert("操作成功");
-        setSelectedUser(null);
-        setReason("");
-        setAction("");
-        fetchUsers();
-      } else {
-        alert(data.error || "操作失败");
+      if (act === 'freeze') {
+        await adminApi.users.freeze(userId, reason);
+      } else if (act === 'unfreeze') {
+        await adminApi.users.unfreeze(userId, reason);
+      } else if (act === 'auth_approve') {
+        // 调用认证审核API
+        await fetch('/api/admin/audits', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'approve',
+            targetType: 'user_auth',
+            targetId: userId,
+            data: { reason }
+          })
+        });
+      } else if (act === 'auth_reject') {
+        await fetch('/api/admin/audits', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'reject',
+            targetType: 'user_auth',
+            targetId: userId,
+            data: { reason }
+          })
+        });
       }
-    } catch (err) {
-      alert("操作失败");
+      
+      alert("操作成功");
+      setSelectedUser(null);
+      setReason("");
+      setAction("");
+      fetchUsers();
+    } catch (err: any) {
+      alert(err.message || "操作失败");
     }
   };
 

@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase';
 import { fetchSinaQuotes } from '@/lib/sina-quote';
-import { batchDeleteStockCache } from '@/lib/kv';
 
 export async function GET(req: NextRequest) {
   try {
@@ -28,11 +27,11 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    const stockSymbols = stocks.map(s => s.symbol);
+    const stockSymbols = stocks.map((s: any) => s.symbol);
     
-    // 2. 批量删除缓存（让后续请求抓取最新价）
-    await batchDeleteStockCache(stockSymbols);
-    console.log(`已清理 ${stockSymbols.length} 只股票的缓存`);
+    // 2. 批量删除缓存（让后续请求抓取最新价）- Vercel KV已废弃，跳过此步骤
+    // await batchDeleteStockCache(stockSymbols);
+    console.log(`准备同步 ${stockSymbols.length} 只股票行情`);
 
     // 3. 批量获取新浪行情数据
     const quotes = await fetchSinaQuotes(stockSymbols);

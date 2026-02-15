@@ -1,4 +1,20 @@
-import { cache } from './vercel-kv';
+// 简单的内存缓存（Vercel KV已废弃，使用内存缓存替代）
+const memoryCache = new Map<string, { data: any; expiry: number }>();
+
+const cache = {
+  get: async (key: string) => {
+    const item = memoryCache.get(key);
+    if (item && item.expiry > Date.now()) {
+      return item.data;
+    }
+    memoryCache.delete(key);
+    return null;
+  },
+  set: async (key: string, data: any, ttl: number) => {
+    memoryCache.set(key, { data, expiry: Date.now() + ttl * 1000 });
+  }
+};
+
 import { fetchSinaQuote } from './sina-quote';
 import { logAudit } from './audit';
 import { supabase } from './supabase';

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { DollarSign, RefreshCw } from "lucide-react";
+import { getAdminAuthHeaders } from "@/lib/admin-api";
 
 export default function FlowManagePage() {
   const [flows, setFlows] = useState<any[]>([]);
@@ -10,9 +11,10 @@ export default function FlowManagePage() {
   const fetchFlows = async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/user?action=flows');
+      const headers = getAdminAuthHeaders();
+      const res = await fetch('/api/admin/users?action=flows', { headers });
       const data = await res.json();
-      if (data.success) setFlows(data.data || []);
+      if (data.success || data.data) setFlows(data.data || []);
     } catch (err) {
       console.error(err);
     } finally {

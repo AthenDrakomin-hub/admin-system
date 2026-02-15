@@ -45,7 +45,7 @@ export async function request<T = any>(
   };
 
   // Add authorization header if token exists
-  const token = localStorage.getItem('adminToken');
+  const token = localStorage.getItem('token');
   if (token) {
     defaultHeaders['Authorization'] = `Bearer ${token}`;
   }

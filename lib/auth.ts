@@ -73,6 +73,8 @@ export async function verifyAdminAuth(token: string): Promise<AdminUser | null> 
       return null;
     }
     
+    console.log('verifyAdminAuth - 查询管理员:', decoded.username);
+    
     const { data: adminData, error } = await supabase
       .from('admins')
       .select('*')

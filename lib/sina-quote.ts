@@ -2,7 +2,21 @@
 // 无需 API Key，完全免费
 import iconv from 'iconv-lite';
 import type { PostgrestError } from '@supabase/supabase-js';
-import { getStockCache, setStockCache } from './kv';
+
+// 简单的内存缓存替代方案
+const stockCache = new Map<string, { data: any; expiry: number }>();
+
+const getStockCache = async (key: string) => {
+  const item = stockCache.get(key);
+  if (item && item.expiry > Date.now()) {
+    return item.data;
+  }
+  return null;
+};
+
+const setStockCache = async (key: string, data: any, ttl: number = 300) => {
+  stockCache.set(key, { data, expiry: Date.now() + ttl * 1000 });
+};
 
 interface SinaQuote {
   symbol: string;

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { DollarSign, AlertCircle, ChevronDown } from "lucide-react";
+import { adminApi, getAdminInfo } from "@/lib/admin-api";
 
 export default function FundsPage() {
   const [userId, setUserId] = useState("");
@@ -22,9 +23,8 @@ export default function FundsPage() {
 
   const fetchUsers = async () => {
     try {
-      const res = await fetch('/api/user');
-      const data = await res.json();
-      if (data.success) setUsers(data.data || []);
+      const data = await adminApi.users.list();
+      setUsers(data.data || []);
     } catch (err) {
       console.error(err);
     }
@@ -37,28 +37,16 @@ export default function FundsPage() {
     }
     try {
       setLoading(true);
-      const res = await fetch('/api/user', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'adjust_balance',
-          userId,
-          amount: parseFloat(amount) * (type === 'subtract' ? -1 : 1),
-          currency,
-          reason,
-          adminId: localStorage.getItem('adminId') || '',
-          adminName: localStorage.getItem('adminName') || ''
-        }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        alert('操作成功');
-        setUserId('');
-        setAmount('');
-        setReason('');
-      } else {
-        alert(`失败: ${data.error}`);
-      }
+      
+      const adjustAmount = parseFloat(amount) * (type === 'subtract' ? -1 : 1);
+      await adminApi.users.adjustBalance(userId, adjustAmount, currency, reason);
+      
+      alert('操作成功');
+      setUserId('');
+      setAmount('');
+      setReason('');
+    } catch (err: any) {
+      alert(`失败: ${err.message || '操作失败'}`);
     } finally {
       setLoading(false);
     }

@@ -58,7 +58,7 @@ export default function TradeAudit({ tradeType, title, icon, adminPermissions }:
       setError(null);
       
       // 获取管理员token
-      const token = localStorage.getItem('adminToken');
+      const token = localStorage.getItem('token');
       if (!token) {
         setError("管理员未登录");
         setLoading(false);
@@ -103,7 +103,7 @@ export default function TradeAudit({ tradeType, title, icon, adminPermissions }:
     try {
       setProcessingId(targetId);
       
-      const token = localStorage.getItem('adminToken');
+      const token = localStorage.getItem('token');
       const adminId = localStorage.getItem('adminId');
       const adminName = localStorage.getItem('adminName');
       

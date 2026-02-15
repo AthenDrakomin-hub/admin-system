@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Shield, Save } from "lucide-react";
+import { adminApi } from "@/lib/admin-api";
 
 export default function RiskRulesPage() {
   const [rules, setRules] = useState({
@@ -13,20 +14,29 @@ export default function RiskRulesPage() {
   });
   const [loading, setLoading] = useState(false);
 
+  // 加载风控规则
+  useEffect(() => {
+    fetchRules();
+  }, []);
+
+  const fetchRules = async () => {
+    try {
+      const data = await adminApi.config.get('risk');
+      if (data.data) {
+        setRules(prev => ({ ...prev, ...data.data }));
+      }
+    } catch (err) {
+      console.error('加载风控规则失败:', err);
+    }
+  };
+
   const handleSave = async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/system', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'update_risk_rules', rules }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        alert('保存成功');
-      } else {
-        alert(`失败: ${data.error}`);
-      }
+      await adminApi.config.update('risk', rules);
+      alert('保存成功');
+    } catch (err: any) {
+      alert(`失败: ${err.message || '保存失败'}`);
     } finally {
       setLoading(false);
     }
