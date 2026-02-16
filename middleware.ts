@@ -8,35 +8,53 @@ const ALLOWED_CLIENT_ORIGIN = 'https://www.zhengyutouzi.com';
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   
-  // 客户端API - 仅允许客户端域名访问
+  // 客户端API - CORS配置
   if (pathname.startsWith('/api/client')) {
     const origin = request.headers.get('origin');
     const referer = request.headers.get('referer');
     
-    // 检查来源
+    // 检查来源 - 仅允许客户端域名
     const isAllowed = 
       origin === ALLOWED_CLIENT_ORIGIN || 
-      referer?.startsWith(ALLOWED_CLIENT_ORIGIN);
+      referer?.startsWith(ALLOWED_CLIENT_ORIGIN) ||
+      process.env.NODE_ENV === 'development'; // 开发环境允许所有来源
     
-    if (!isAllowed && process.env.NODE_ENV === 'production') {
+    // 构建CORS响应头
+    const corsHeaders = new Headers();
+    
+    if (isAllowed) {
+      // 设置CORS头
+      corsHeaders.set('Access-Control-Allow-Origin', origin || ALLOWED_CLIENT_ORIGIN);
+      corsHeaders.set('Access-Control-Allow-Credentials', 'true'); // 关键：允许携带凭证
+      corsHeaders.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+      corsHeaders.set('Access-Control-Allow-Headers', 'Authorization, Content-Type, Cookie, X-Requested-With');
+      corsHeaders.set('Access-Control-Max-Age', '86400');
+      corsHeaders.set('Access-Control-Expose-Headers', 'Content-Length, Content-Range');
+    } else if (process.env.NODE_ENV === 'production') {
+      // 生产环境拒绝非法来源
       return NextResponse.json(
-        { success: false, error: 'Forbidden' },
+        { success: false, error: 'Forbidden: Cross-origin request not allowed' },
         { status: 403 }
       );
     }
     
-    // OPTIONS 预检请求
+    // OPTIONS 预检请求处理
     if (request.method === 'OPTIONS') {
       return new NextResponse(null, {
-        status: 200,
-        headers: {
-          'Access-Control-Allow-Origin': ALLOWED_CLIENT_ORIGIN,
-          'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-          'Access-Control-Max-Age': '86400',
-        },
+        status: 204,
+        headers: corsHeaders,
       });
     }
+    
+    // 对于非OPTIONS请求，继续处理并添加CORS头
+    const response = NextResponse.next();
+    
+    // 添加CORS头到响应
+    corsHeaders.forEach((value, key) => {
+      response.headers.set(key, value);
+    });
+    
+    return response;
   }
   
   // 管理员API - 权限验证
