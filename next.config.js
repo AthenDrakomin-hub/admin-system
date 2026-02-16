@@ -22,6 +22,21 @@ const nextConfig = {
       },
     ],
   },
+
+  // 所有/admin下面的页面永远动态，永远不要预渲染
+  async headers() {
+    return [
+      {
+        source: '/admin/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'no-cache, no-store, must-revalidate',
+          },
+        ],
+      },
+    ];
+  },
 };
 
 module.exports = nextConfig;
