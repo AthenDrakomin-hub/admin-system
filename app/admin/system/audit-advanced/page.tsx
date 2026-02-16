@@ -101,6 +101,7 @@ export default function AuditAdvancedPage() {
                 setFilters({ ...filters, actionType: e.target.value })
               }
               className="w-full px-3 py-2 border rounded-lg mt-1"
+              aria-label="选择操作类型"
             >
               <option value="">全部</option>
               <option value="fund_adjust">资金调整</option>
@@ -132,6 +133,7 @@ export default function AuditAdvancedPage() {
                 setFilters({ ...filters, startDate: e.target.value })
               }
               className="w-full px-3 py-2 border rounded-lg mt-1"
+              aria-label="选择开始日期"
             />
           </div>
 
@@ -144,6 +146,7 @@ export default function AuditAdvancedPage() {
                 setFilters({ ...filters, endDate: e.target.value })
               }
               className="w-full px-3 py-2 border rounded-lg mt-1"
+              aria-label="选择结束日期"
             />
           </div>
         </div>

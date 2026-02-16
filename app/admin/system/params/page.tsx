@@ -39,6 +39,7 @@ export default function ParamsPage() {
                 value={config.exchange_rates.hkd_cny}
                 onChange={(e) => setConfig({...config, exchange_rates: {...config.exchange_rates, hkd_cny: parseFloat(e.target.value)}})}
                 className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                aria-label="HKD/CNY 汇率"
               />
             </div>
             <div>
@@ -64,6 +65,7 @@ export default function ParamsPage() {
                 step="0.0001"
                 value={config.fees.a_share_commission}
                 className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                aria-label="A股佣金率"
               />
             </div>
             <div>
@@ -73,6 +75,7 @@ export default function ParamsPage() {
                 step="0.0001"
                 value={config.fees.a_share_stamp_duty}
                 className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                aria-label="A股印花税率"
               />
             </div>
             <div>
@@ -81,6 +84,7 @@ export default function ParamsPage() {
                 type="number"
                 value={config.fees.a_share_min_commission}
                 className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                aria-label="A股最低佣金"
               />
             </div>
           </div>
@@ -96,6 +100,7 @@ export default function ParamsPage() {
                 type="number"
                 value={config.board_limits.daily_user_quota}
                 className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                aria-label="每日用户限额"
               />
             </div>
             <div>
@@ -104,6 +109,7 @@ export default function ParamsPage() {
                 type="number"
                 value={config.board_limits.manual_approval_threshold}
                 className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                aria-label="人工审核阈值"
               />
             </div>
           </div>
@@ -119,6 +125,7 @@ export default function ParamsPage() {
                 type="number"
                 value={config.block_thresholds.min_amount}
                 className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                aria-label="最低金额"
               />
             </div>
             <div>
@@ -128,6 +135,7 @@ export default function ParamsPage() {
                 step="0.01"
                 value={config.block_thresholds.max_discount_rate}
                 className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                aria-label="最大折扣率"
               />
             </div>
           </div>
@@ -143,6 +151,7 @@ export default function ParamsPage() {
                 type="number"
                 value={config.withdraw_rules.min_amount}
                 className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                aria-label="最低金额"
               />
             </div>
             <div>
@@ -151,6 +160,7 @@ export default function ParamsPage() {
                 type="number"
                 value={config.withdraw_rules.max_amount}
                 className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                aria-label="最高金额"
               />
             </div>
             <div>
@@ -159,6 +169,7 @@ export default function ParamsPage() {
                 type="number"
                 value={config.withdraw_rules.daily_limit}
                 className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                aria-label="每日限额"
               />
             </div>
           </div>
@@ -169,6 +180,7 @@ export default function ParamsPage() {
                 checked={config.withdraw_rules.require_flow_settled}
                 onChange={(e) => setConfig({...config, withdraw_rules: {...config.withdraw_rules, require_flow_settled: e.target.checked}})}
                 className="w-4 h-4 text-primary rounded"
+                aria-label="要求流水结清后才能提现"
               />
               <span className="text-sm text-slate-700">要求流水结清后才能提现</span>
             </label>

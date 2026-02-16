@@ -141,6 +141,7 @@ export default function StocksPage() {
                 min="1"
                 max="60"
                 className="w-full px-3 py-2 border rounded-lg mt-1"
+                aria-label="刷新频率（秒）"
               />
             </div>
 

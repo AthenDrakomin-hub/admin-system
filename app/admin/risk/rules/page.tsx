@@ -61,7 +61,7 @@ export default function RiskRulesPage() {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-2">单日用户限额（元）</label>
-              <input type="number" value={rules.board_daily_limit} onChange={(e) => setRules({...rules, board_daily_limit: parseInt(e.target.value)})} className="w-full px-4 py-2 border rounded-lg" />
+              <input type="number" value={rules.board_daily_limit} onChange={(e) => setRules({...rules, board_daily_limit: parseInt(e.target.value)})} className="w-full px-4 py-2 border rounded-lg" aria-label="单日用户限额（元）" />
             </div>
           </div>
         </div>
@@ -71,11 +71,11 @@ export default function RiskRulesPage() {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-2">单笔限额（元）</label>
-              <input type="number" value={rules.withdraw_single_limit} onChange={(e) => setRules({...rules, withdraw_single_limit: parseInt(e.target.value)})} className="w-full px-4 py-2 border rounded-lg" />
+              <input type="number" value={rules.withdraw_single_limit} onChange={(e) => setRules({...rules, withdraw_single_limit: parseInt(e.target.value)})} className="w-full px-4 py-2 border rounded-lg" aria-label="单笔限额（元）" />
             </div>
             <div>
               <label className="block text-sm font-medium mb-2">单日限额（元）</label>
-              <input type="number" value={rules.withdraw_daily_limit} onChange={(e) => setRules({...rules, withdraw_daily_limit: parseInt(e.target.value)})} className="w-full px-4 py-2 border rounded-lg" />
+              <input type="number" value={rules.withdraw_daily_limit} onChange={(e) => setRules({...rules, withdraw_daily_limit: parseInt(e.target.value)})} className="w-full px-4 py-2 border rounded-lg" aria-label="单日限额（元）" />
             </div>
           </div>
         </div>
@@ -85,7 +85,7 @@ export default function RiskRulesPage() {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-2">单日交易笔数上限</label>
-              <input type="number" value={rules.trade_daily_count} onChange={(e) => setRules({...rules, trade_daily_count: parseInt(e.target.value)})} className="w-full px-4 py-2 border rounded-lg" />
+              <input type="number" value={rules.trade_daily_count} onChange={(e) => setRules({...rules, trade_daily_count: parseInt(e.target.value)})} className="w-full px-4 py-2 border rounded-lg" aria-label="单日交易笔数上限" />
             </div>
           </div>
         </div>
@@ -95,7 +95,7 @@ export default function RiskRulesPage() {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-2">最低金额（元）</label>
-              <input type="number" value={rules.block_min_amount} onChange={(e) => setRules({...rules, block_min_amount: parseInt(e.target.value)})} className="w-full px-4 py-2 border rounded-lg" />
+              <input type="number" value={rules.block_min_amount} onChange={(e) => setRules({...rules, block_min_amount: parseInt(e.target.value)})} className="w-full px-4 py-2 border rounded-lg" aria-label="最低金额（元）" />
             </div>
           </div>
         </div>

@@ -74,6 +74,7 @@ export default function ReconciliationPage() {
           value={period}
           onChange={(e) => setPeriod(e.target.value as any)}
           className="px-4 py-2 border rounded-lg"
+          aria-label="选择对账周期"
         >
           <option value="day">按日</option>
           <option value="week">按周</option>

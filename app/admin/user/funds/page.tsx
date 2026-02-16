@@ -111,14 +111,14 @@ export default function FundsPage() {
           </div>
           <div>
             <label className="block text-sm font-medium mb-2">币种</label>
-            <select value={currency} onChange={(e) => setCurrency(e.target.value as any)} className="w-full px-4 py-2 border rounded-lg">
+            <select value={currency} onChange={(e) => setCurrency(e.target.value as any)} className="w-full px-4 py-2 border rounded-lg" aria-label="选择币种">
               <option value="CNY">CNY</option>
               <option value="HKD">HKD</option>
             </select>
           </div>
           <div>
             <label className="block text-sm font-medium mb-2">金额</label>
-            <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} className="w-full px-4 py-2 border rounded-lg" placeholder="输入金额" />
+            <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} className="w-full px-4 py-2 border rounded-lg" placeholder="输入金额" aria-label="金额" />
           </div>
           <div>
             <label className="block text-sm font-medium mb-2">原因（必填）</label>

@@ -1,57 +1,80 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { approveRecharge, approveWithdraw, getPendingRecharges, getPendingWithdraws } from '@/lib/finance';
+'use server';
 
-export async function GET(req: NextRequest) {
+import { NextResponse } from 'next/server';
+import { 
+  getRechargeRequests, 
+  getWithdrawRequests, 
+  approveRechargeRequest, 
+  approveWithdrawRequest 
+} from '@/lib/finance';
+
+// GET - 管理端获取申请列表（充值/提现）
+export async function GET(request: Request) {
   try {
-    const { searchParams } = new URL(req.url);
-    const type = searchParams.get('type');
-    const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '20');
+    const { searchParams } = new URL(request.url);
+    const type = searchParams.get('type'); // recharge/withdraw
+    const status = searchParams.get('status'); // pending/approved/rejected
     
-    let result;
+    let data;
     if (type === 'recharge') {
-      result = await getPendingRecharges(page, limit);
+      data = await getRechargeRequests(status || undefined);
     } else if (type === 'withdraw') {
-      result = await getPendingWithdraws(page, limit);
+      data = await getWithdrawRequests(status || undefined);
     } else {
-      return NextResponse.json({ success: false, error: 'Invalid type' }, { status: 400 });
+      return NextResponse.json(
+        { success: false, error: '缺少type参数（recharge/withdraw）' },
+        { status: 400 }
+      );
     }
     
-    return NextResponse.json({ 
-      success: true, 
-      data: result.data,
-      pagination: {
-        page,
-        limit,
-        total: result.total,
-        pages: Math.ceil(result.total / limit)
-      }
+    return NextResponse.json({
+      success: true,
+      data: { requests: data }
     });
-  } catch (error: any) {
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  } catch (err: any) {
+    console.error('管理端获取申请列表失败:', err);
+    return NextResponse.json(
+      { success: false, error: err.message || '服务器内部错误' },
+      { status: 500 }
+    );
   }
 }
 
-export async function POST(req: NextRequest) {
+// POST - 管理端审批申请
+export async function POST(request: Request) {
   try {
-    const { type, requestId, action, adminId, adminName, reason } = await req.json();
+    const body = await request.json();
+    const { type, requestId, approve } = body;
     
-    if (!type || !requestId || !action || !adminId || !adminName) {
-      return NextResponse.json({ success: false, error: '缺少必要参数' }, { status: 400 });
+    // 校验参数
+    if (!type || !requestId || approve === undefined) {
+      return NextResponse.json(
+        { success: false, error: '缺少必要参数（type/requestId/approve）' },
+        { status: 400 }
+      );
     }
     
     let result;
     if (type === 'recharge') {
-      result = await approveRecharge(requestId, adminId, adminName, action, reason);
+      result = await approveRechargeRequest(requestId, approve);
     } else if (type === 'withdraw') {
-      result = await approveWithdraw(requestId, adminId, adminName, action, reason);
+      result = await approveWithdrawRequest(requestId, approve);
     } else {
-      return NextResponse.json({ success: false, error: 'Invalid type' }, { status: 400 });
+      return NextResponse.json(
+        { success: false, error: '无效的type参数（recharge/withdraw）' },
+        { status: 400 }
+      );
     }
     
-    return NextResponse.json(result);
-  } catch (error: any) {
-    console.error('Finance approval error:', error);
-    return NextResponse.json({ success: false, error: error.message || '审批失败' }, { status: 500 });
+    return NextResponse.json({
+      success: true,
+      data: result
+    });
+  } catch (err: any) {
+    console.error('管理端审批申请失败:', err);
+    return NextResponse.json(
+      { success: false, error: err.message || '服务器内部错误' },
+      { status: 500 }
+    );
   }
 }

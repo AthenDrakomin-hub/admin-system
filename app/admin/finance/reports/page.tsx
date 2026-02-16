@@ -84,6 +84,7 @@ export default function FinanceReportsPage() {
           value={reportType}
           onChange={(e) => setReportType(e.target.value as any)}
           className="px-4 py-2 border rounded-lg"
+          aria-label="选择报表类型"
         >
           <option value="day">按日</option>
           <option value="month">按月</option>

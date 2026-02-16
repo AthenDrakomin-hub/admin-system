@@ -33,7 +33,7 @@ export default function TradeReportPage() {
           <h1 className="text-2xl font-bold">交易报表</h1>
         </div>
         <div className="flex gap-2">
-          <select value={dateRange} onChange={(e) => setDateRange(e.target.value)} className="px-4 py-2 border rounded-lg">
+          <select value={dateRange} onChange={(e) => setDateRange(e.target.value)} className="px-4 py-2 border rounded-lg" aria-label="选择日期范围">
             <option value="today">今日</option>
             <option value="week">本周</option>
             <option value="month">本月</option>

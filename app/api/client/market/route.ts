@@ -28,7 +28,24 @@ export async function GET(req: NextRequest) {
           return clientError('缺少股票代码');
         }
         const quote = await getStockQuote(symbol);
-        return clientResponse({ quote });
+        
+        // 核心：数据结构映射转换（真实结构 → 期望的结构）
+        const mappedData = {
+          symbol: quote.symbol,
+          name: quote.name,
+          current_price: quote.price.toString(), // 转字符串匹配期望格式
+          change: quote.change.toString(),
+          change_percent: quote.changePercent.toString(),
+          volume: quote.volume.toString(),
+          amount: quote.amount.toString(),
+          high: quote.high.toString(),
+          low: quote.low.toString(),
+          open: quote.open.toString(),
+          close: quote.close.toString(),
+          timestamp: quote.timestamp
+        };
+        
+        return clientResponse(mappedData);
       }
 
       case 'search': {

@@ -259,3 +259,23 @@ export const validateAdminAction = (
   
   return { allowed: true };
 };
+
+// 管理端新建用户请求类型
+export interface CreateUserRequest {
+  username: string;
+  password: string;
+  real_name: string;
+  phone: string;
+  email?: string;
+  status?: 'active' | 'pending' | 'disabled';
+}
+
+// 新建用户响应类型
+export interface CreateUserResponse {
+  success: boolean;
+  data?: {
+    id: string;
+    username: string;
+  };
+  error?: string;
+}

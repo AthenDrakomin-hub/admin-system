@@ -113,6 +113,7 @@ export default function UserMessagesPage() {
                           );
                         }
                       }}
+                      aria-label={`选择用户 ${user.username}`}
                     />
                     <span className="text-sm">{user.username}</span>
                   </label>
@@ -148,6 +149,7 @@ export default function UserMessagesPage() {
                 value={form.type}
                 onChange={(e) => setForm({ ...form, type: e.target.value })}
                 className="w-full px-3 py-2 border rounded-lg mt-1"
+                aria-label="选择消息类型"
               >
                 <option value="notification">通知</option>
                 <option value="alert">警告</option>

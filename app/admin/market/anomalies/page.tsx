@@ -114,6 +114,7 @@ export default function AnomaliesPage() {
                 value={form.type}
                 onChange={(e) => setForm({ ...form, type: e.target.value })}
                 className="w-full px-3 py-2 border rounded-lg mt-1"
+                aria-label="选择异常类型"
               >
                 <option value="error">错误数据</option>
                 <option value="outdated">过期数据</option>
