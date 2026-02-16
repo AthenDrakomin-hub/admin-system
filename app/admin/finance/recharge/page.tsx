@@ -33,7 +33,17 @@ export default function RechargeAuditPage() {
       const data: ApiResponse = await res.json();
       
       if (data.success) {
-        setRequests(data.data);
+        // 处理不同的数据格式：data.data 可能是数组或 {requests: array}
+        const responseData = data.data;
+        if (Array.isArray(responseData)) {
+          setRequests(responseData);
+        } else if (responseData && responseData.requests && Array.isArray(responseData.requests)) {
+          setRequests(responseData.requests);
+        } else {
+          // 如果数据格式不符合预期，设置为空数组
+          console.warn('API返回的数据格式不符合预期:', responseData);
+          setRequests([]);
+        }
       } else {
         setError(data.error || '获取数据失败');
       }

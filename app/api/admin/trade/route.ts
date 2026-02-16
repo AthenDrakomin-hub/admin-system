@@ -79,10 +79,11 @@ export async function GET(req: NextRequest) {
         break;
 
       case 'block':
-        // 查询大宗交易订单
+        // 查询大宗交易订单 - 使用orders表，trade_type = 'block'
         let blockQuery = supabase
-          .from('block_orders')
+          .from('orders')
           .select('*, users(username, real_name, phone)', { count: 'exact' })
+          .eq('trade_type', 'block')
           .eq('status', status);
 
         if (userId) {
@@ -100,11 +101,11 @@ export async function GET(req: NextRequest) {
         break;
 
       case 'ipo':
-        // 查询IPO申购记录
+        // 查询IPO申购记录 - ipo_applications表没有status字段，使用qualification_status
         let ipoQuery = supabase
           .from('ipo_applications')
-          .select('*, users(username, real_name, phone), ipo_stocks(*)', { count: 'exact' })
-          .eq('status', status);
+          .select('*, users(username, real_name, phone)', { count: 'exact' })
+          .eq('qualification_status', status);
 
         if (userId) {
           ipoQuery = ipoQuery.eq('user_id', userId);
@@ -121,31 +122,33 @@ export async function GET(req: NextRequest) {
         break;
 
       case 'board':
-        // 查询一键打板策略
+        // 查询一键打板策略 - 使用orders表，trade_type = 'board'
         let boardQuery = supabase
-          .from('board_strategies')
+          .from('orders')
           .select('*, users(username, real_name, phone)', { count: 'exact' })
+          .eq('trade_type', 'board')
           .eq('status', status);
 
         if (userId) {
           boardQuery = boardQuery.eq('user_id', userId);
         }
 
-        const { data: boardStrategies, count: boardCount, error: boardError } = await boardQuery
+        const { data: boardOrders, count: boardCount, error: boardError } = await boardQuery
           .order('created_at', { ascending: false })
           .range((page - 1) * limit, page * limit - 1);
 
         if (boardError) throw boardError;
 
-        result = boardStrategies || [];
+        result = boardOrders || [];
         total = boardCount || 0;
         break;
 
       case 'conditional':
-        // 查询条件单
+        // 查询条件单 - 使用orders表，trade_type = 'conditional'
         let conditionalQuery = supabase
-          .from('conditional_orders')
+          .from('orders')
           .select('*, users(username, real_name, phone)', { count: 'exact' })
+          .eq('trade_type', 'conditional')
           .eq('status', status);
 
         if (userId) {
