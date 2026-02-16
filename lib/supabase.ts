@@ -10,6 +10,19 @@ export const supabase = supabaseUrl && supabaseServiceKey
   : null;
 
 /**
+ * 创建服务器端Supabase客户端（用于认证）
+ */
+export function createSupabaseServerClient() {
+  if (!supabaseUrl || !supabaseServiceKey) {
+    throw new Error('Supabase not configured');
+  }
+  
+  // 使用服务角色密钥创建客户端，可以调用auth.getUser()等
+  const client = createClient(supabaseUrl, supabaseServiceKey);
+  return client;
+}
+
+/**
  * 管理员操作客户端（带RLS上下文）
  * @param adminUsername 管理员账号
  */

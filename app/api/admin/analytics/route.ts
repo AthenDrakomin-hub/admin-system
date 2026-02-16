@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
-import { verifyAdminAuth } from '@/lib/auth';
+import { requireAdmin } from '@/lib/admin';
 
 /**
  * 管理端高级统计分析API
@@ -17,17 +17,11 @@ import { verifyAdminAuth } from '@/lib/auth';
 export async function GET(req: NextRequest) {
   try {
     // 验证管理员身份
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json({ success: false, error: '未授权访问' }, { status: 401 });
+    const authResult = await requireAdmin();
+    if (authResult instanceof NextResponse) {
+      return authResult; // 返回错误响应
     }
-
-    const token = authHeader.substring(7);
-    const admin = await verifyAdminAuth(token);
-
-    if (!admin) {
-      return NextResponse.json({ success: false, error: '无效的管理员认证' }, { status: 401 });
-    }
+    const { user } = authResult;
 
     const { searchParams } = new URL(req.url);
     const type = searchParams.get('type') || 'overview'; // users, trades, finance, performance, overview
@@ -62,17 +56,11 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     // 验证管理员身份
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json({ success: false, error: '未授权访问' }, { status: 401 });
+    const authResult = await requireAdmin();
+    if (authResult instanceof NextResponse) {
+      return authResult; // 返回错误响应
     }
-
-    const token = authHeader.substring(7);
-    const admin = await verifyAdminAuth(token);
-
-    if (!admin) {
-      return NextResponse.json({ success: false, error: '无效的管理员认证' }, { status: 401 });
-    }
+    const { user } = authResult;
 
     const body = await req.json();
     const { report_type, dimensions, metrics, filters, date_range } = body;
@@ -89,8 +77,8 @@ export async function POST(req: NextRequest) {
     
     // 记录审计日志
     await supabase.from('audit_logs').insert({
-      admin_id: admin.username,
-      admin_name: admin.username,
+      admin_id: user.id,
+      admin_name: user.email || user.id,
       action: 'generate_custom_report',
       target_type: 'analytics',
       target_id: null,
