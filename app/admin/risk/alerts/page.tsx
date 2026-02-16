@@ -12,9 +12,24 @@ export default function RiskAlertsPage() {
       setLoading(true);
       const res = await fetch('/api/system?action=risk_alerts');
       const data = await res.json();
-      if (data.success) setAlerts(data.data || []);
+      
+      if (data.success) {
+        // 确保 data.data 是数组，如果不是则转换为空数组
+        const alertsData = data.data;
+        if (Array.isArray(alertsData)) {
+          setAlerts(alertsData);
+        } else {
+          // 如果 data.data 不是数组，设置为空数组
+          console.warn('API返回的风险预警数据不是数组:', alertsData);
+          setAlerts([]);
+        }
+      } else {
+        // API返回失败，设置为空数组
+        setAlerts([]);
+      }
     } catch (err) {
-      console.error(err);
+      console.error('获取风险预警数据失败:', err);
+      setAlerts([]);
     } finally {
       setLoading(false);
     }
@@ -51,10 +66,10 @@ export default function RiskAlertsPage() {
           <tbody>
             {loading ? (
               <tr><td colSpan={5} className="text-center py-12">加载中...</td></tr>
-            ) : alerts.length === 0 ? (
+            ) : !alerts || alerts.length === 0 ? (
               <tr><td colSpan={5} className="text-center py-12">暂无风险预警</td></tr>
             ) : (
-              alerts.map((alert, i) => (
+              alerts?.map((alert, i) => (
                 <tr key={i} className="border-b hover:bg-slate-50">
                   <td className="py-3 px-4 text-sm">{new Date(alert.created_at).toLocaleString()}</td>
                   <td className="py-3 px-4">{alert.user_id}</td>
@@ -69,7 +84,7 @@ export default function RiskAlertsPage() {
                     </button>
                   </td>
                 </tr>
-              ))
+              )) || null
             )}
           </tbody>
         </table>

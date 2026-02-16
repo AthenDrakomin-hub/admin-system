@@ -82,7 +82,26 @@ export async function createClientUserClient(userId: string) {
   return client;
 }
 
+// 新增：JWT 解码函数（无需安装依赖，纯前端解析）
+function decodeJwt(token: string) {
+  try {
+    const payload = token.split('.')[1];
+    const decoded = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
+    return JSON.parse(decoded);
+  } catch (error) {
+    return null;
+  }
+}
+
 // 调试日志：验证变量是否加载成功
 console.log('✅ Supabase URL:', supabaseUrl ? '已加载' : '未加载');
 console.log('✅ Service Role 密钥长度:', supabaseServiceKey?.length || '0'); // 应该是100+
-console.log('✅ 密钥是否包含 service_role:', supabaseServiceKey?.includes('service_role') ? '是' : '否');
+
+// 使用JWT解码验证密钥类型
+if (supabaseServiceKey) {
+  const decoded = decodeJwt(supabaseServiceKey);
+  console.log('✅ JWT 解码后的 role:', decoded?.role || '未知'); // 会显示 service_role
+  console.log('✅ 密钥是否为 service_role 类型:', decoded?.role === 'service_role'); // 会显示 true
+} else {
+  console.log('❌ Service Role 密钥未加载');
+}

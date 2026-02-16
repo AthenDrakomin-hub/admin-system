@@ -17,6 +17,7 @@ const cache = {
 
 import { logAudit } from './audit';
 import { supabase } from './supabase';
+import { getStockData } from './stock-data';
 
 const CACHE_TTL = 300;
 const FALLBACK_TTL = 3600;
@@ -31,31 +32,27 @@ export async function fetchMarketData(symbol: string) {
     const market = symbol.startsWith('6') ? 'CN' : 
                   (symbol.startsWith('0') || symbol.startsWith('3')) ? 'CN' : 'HK';
     
-    // 调用数据源API
-    const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ''}/api/data-source/${symbol}?market=${market}`, {
-      next: { revalidate: 0 }
-    });
+    // 使用新的稳定数据源
+    const stockData = await getStockData(symbol, market);
     
-    if (!response.ok) {
-      throw new Error(`Data source API failed with status: ${response.status}`);
+    if (!stockData) {
+      throw new Error('Failed to fetch stock data from Yahoo Finance');
     }
     
-    const data = await response.json();
-    
-    // 映射数据格式
+    // 映射数据格式（保持向后兼容）
     const quote = {
-      symbol: data.symbol,
-      name: '', // 数据源API可能不返回名称，需要从数据库获取或留空
-      price: data.price || 0,
-      change: data.change || 0,
-      changePercent: data.percentChange || 0,
-      open: data.price || 0, // 数据源API可能不返回开盘价，暂时用当前价格
-      close: data.price || 0, // 数据源API可能不返回收盘价，暂时用当前价格
-      high: data.price || 0, // 数据源API可能不返回最高价，暂时用当前价格
-      low: data.price || 0, // 数据源API可能不返回最低价，暂时用当前价格
-      volume: 0, // 数据源API可能不返回成交量
-      amount: 0, // 数据源API可能不返回成交额
-      timestamp: data.updatedAt || new Date().toISOString()
+      symbol: stockData.symbol,
+      name: stockData.name || '',
+      price: stockData.price || 0,
+      change: stockData.change || 0,
+      changePercent: stockData.percentChange || 0,
+      open: stockData.price || 0, // Yahoo Finance可能不返回开盘价，暂时用当前价格
+      close: stockData.price || 0, // Yahoo Finance可能不返回收盘价，暂时用当前价格
+      high: stockData.price || 0, // Yahoo Finance可能不返回最高价，暂时用当前价格
+      low: stockData.price || 0, // Yahoo Finance可能不返回最低价，暂时用当前价格
+      volume: 0, // Yahoo Finance可能不返回成交量
+      amount: 0, // Yahoo Finance可能不返回成交额
+      timestamp: stockData.timestamp || new Date().toISOString()
     };
     
     // 自动存入数据库（如果不存在）

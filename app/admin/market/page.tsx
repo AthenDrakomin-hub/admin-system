@@ -24,12 +24,37 @@ export default function MarketPage() {
     setLoading(true);
     try {
       const res = await fetch(`/api/market?symbols=${watchlist.join(',')}`);
+      
+      // 检查响应是否为JSON
+      const contentType = res.headers.get('content-type');
+      if (!contentType?.includes('application/json')) {
+        const html = await res.text();
+        console.error('Market API返回非JSON数据:', html.substring(0, 200));
+        setQuotes([]);
+        return;
+      }
+      
       const data = await res.json();
-      if (data.success) {
-        setQuotes(data.data);
+      
+      if (data.success && Array.isArray(data.data)) {
+        // 确保每个quote都有有效的数字字段
+        const validatedQuotes = data.data.map((quote: any) => ({
+          symbol: quote.symbol || '',
+          name: quote.name || '',
+          price: Number(quote.price) || 0,
+          change: Number(quote.change) || 0,
+          changePercent: Number(quote.changePercent) || 0,
+          volume: Number(quote.volume) || 0,
+          amount: Number(quote.amount) || 0,
+        }));
+        setQuotes(validatedQuotes);
+      } else {
+        console.warn('Market API返回数据格式错误:', data);
+        setQuotes([]);
       }
     } catch (error) {
       console.error('Fetch quotes error:', error);
+      setQuotes([]);
     } finally {
       setLoading(false);
     }
@@ -152,28 +177,28 @@ export default function MarketPage() {
                     <td className="py-3 px-4 font-mono text-sm">{quote.symbol}</td>
                     <td className="py-3 px-4 font-medium">{quote.name}</td>
                     <td className={`py-3 px-4 text-right font-bold ${
-                      quote.change > 0 ? 'text-red-600' : quote.change < 0 ? 'text-green-600' : 'text-slate-900'
+                      Number(quote.change) > 0 ? 'text-red-600' : Number(quote.change) < 0 ? 'text-green-600' : 'text-slate-900'
                     }`}>
-                      ¥{quote.price.toFixed(2)}
+                      ¥{(Number(quote.price) || 0).toFixed(2)}
                     </td>
                     <td className={`py-3 px-4 text-right ${
-                      quote.change > 0 ? 'text-red-600' : quote.change < 0 ? 'text-green-600' : 'text-slate-600'
+                      Number(quote.change) > 0 ? 'text-red-600' : Number(quote.change) < 0 ? 'text-green-600' : 'text-slate-600'
                     }`}>
                       <div className="flex items-center justify-end gap-1">
-                        {quote.change > 0 ? <ArrowUp className="w-4 h-4" /> : quote.change < 0 ? <ArrowDown className="w-4 h-4" /> : null}
-                        {quote.change > 0 ? '+' : ''}{quote.change.toFixed(2)}
+                        {Number(quote.change) > 0 ? <ArrowUp className="w-4 h-4" /> : Number(quote.change) < 0 ? <ArrowDown className="w-4 h-4" /> : null}
+                        {Number(quote.change) > 0 ? '+' : ''}{(Number(quote.change) || 0).toFixed(2)}
                       </div>
                     </td>
                     <td className={`py-3 px-4 text-right font-semibold ${
-                      quote.changePercent > 0 ? 'text-red-600' : quote.changePercent < 0 ? 'text-green-600' : 'text-slate-600'
+                      Number(quote.changePercent) > 0 ? 'text-red-600' : Number(quote.changePercent) < 0 ? 'text-green-600' : 'text-slate-600'
                     }`}>
-                      {quote.changePercent > 0 ? '+' : ''}{quote.changePercent.toFixed(2)}%
+                      {Number(quote.changePercent) > 0 ? '+' : ''}{(Number(quote.changePercent) || 0).toFixed(2)}%
                     </td>
                     <td className="py-3 px-4 text-right text-slate-600">
-                      {(quote.volume / 10000).toFixed(2)}万手
+                      {((Number(quote.volume) || 0) / 10000).toFixed(2)}万手
                     </td>
                     <td className="py-3 px-4 text-right text-slate-600">
-                      {(quote.amount / 100000000).toFixed(2)}亿
+                      {((Number(quote.amount) || 0) / 100000000).toFixed(2)}亿
                     </td>
                     <td className="py-3 px-4 text-center">
                       <button
