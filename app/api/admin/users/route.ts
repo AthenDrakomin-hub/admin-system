@@ -266,13 +266,27 @@ export async function POST(req: NextRequest) {
           created_at: new Date().toISOString()
         };
         
-        // 创建用户
-        result = await adminClient
+        // 创建用户 - 修复TypeScript类型错误
+        // 关键修复：给Supabase插入操作添加明确的类型注解
+        const { data: insertedData, error: insertError }: { 
+          data: Array<{ id: string }> | null, 
+          error: any 
+        } = await adminClient
           .from('users')
-          .insert([newUser]);
+          .insert([newUser])
+          .select('id'); // 插入后返回id字段
+        
+        // 处理插入错误
+        if (insertError) {
+          console.error('创建用户失败:', insertError);
+          return NextResponse.json({ success: false, error: '创建用户失败' }, { status: 500 });
+        }
+        
+        // 将插入结果赋值给result变量（保持代码一致性）
+        result = { data: insertedData, error: insertError };
         
         auditData.description = '创建新用户';
-        newUserId = result.data?.[0]?.id || null;
+        newUserId = insertedData?.[0]?.id || null;
         auditData.target_id = newUserId;
         break;
         
