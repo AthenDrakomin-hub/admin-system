@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchMarketData, getStockQuote, searchStocks, getKlineData, getMarketIndices } from '@/lib/market';
-import { fetchSinaQuotes, searchStock } from '@/lib/sina-quote';
 
 // 核心修复：强制该API路由动态渲染，避免静态生成时的错误
 export const dynamic = 'force-dynamic';

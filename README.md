@@ -358,44 +358,60 @@ npm start
     }
     ```
 
-#### 市场数据
-- **市场数据接口**: `GET /api/client/market` - 获取市场相关数据
-  - **查询参数**: `?symbol=<股票代码>&type=<数据类型>`
-  - **响应成功**:
+#### 市场数据（使用配置的数据源：雅虎财经/Alpha Vantage）
+- **统一行情API**: `GET /api/client/market` - 获取市场相关数据
+  - **查询参数**: 
+    - `action` (必需): 操作类型，可选值：`quote`(行情), `search`(搜索), `kline`(K线), `indices`(指数)
+    - `symbol` (可选): 股票代码，如 `000001`
+    - `keyword` (可选): 搜索关键词，用于`action=search`
+    - `period` (可选): K线周期，用于`action=kline`，可选值：`day`(日线，默认), `week`(周线), `month`(月线)
+
+  - **示例请求**:
+    - 获取股票行情: `GET /api/client/market?action=quote&symbol=000001`
+    - 搜索股票: `GET /api/client/market?action=search&keyword=茅台`
+    - 获取K线数据: `GET /api/client/market?action=kline&symbol=000001&period=day`
+    - 获取市场指数: `GET /api/client/market?action=indices`
+
+  - **响应成功** (以quote为例):
     ```json
     {
       "success": true,
       "data": {
-        "symbol": "股票代码",
-        "name": "股票名称",
-        "current_price": "当前价格",
-        "change": "涨跌额",
-        "change_percent": "涨跌幅",
-        "volume": "成交量",
-        "amount": "成交额",
-        "high": "最高价",
-        "low": "最低价",
-        "open": "开盘价",
-        "close": "收盘价",
-        "timestamp": "数据时间"
+        "symbol": "000001",
+        "name": "上证指数",
+        "current_price": "3000.50",
+        "change": "25.30",
+        "change_percent": "0.85",
+        "volume": "1000000",
+        "amount": "1500000000",
+        "high": "3010.20",
+        "low": "2995.80",
+        "open": "2998.50",
+        "close": "2975.20",
+        "timestamp": "2024-01-15T09:30:00.000Z"
       }
     }
     ```
 
-- **股票搜索**: `GET /api/client/market/search` - 搜索股票信息
+  - **数据源配置**:
+    - 通过管理员界面 (`/admin/data-source`) 配置数据源
+    - 支持雅虎财经（免费）和Alpha Vantage（付费）
+    - 可配置缓存时间、API密钥
+    - 支持A股和港股市场独立配置
+
+- **股票搜索API**: `GET /api/client/market/search` - 搜索股票信息
   - **查询参数**: `?keyword=<搜索关键词>`
   - **响应成功**:
     ```json
     {
       "success": true,
       "data": {
-        "stocks": [
+        "results": [
           {
-            "symbol": "股票代码",
-            "name": "股票名称",
-            "market": "市场类型 (a_share/hk_share)",
-            "current_price": "当前价格",
-            "change_percent": "涨跌幅"
+            "symbol": "600519",
+            "name": "贵州茅台",
+            "market": "sh",
+            "currency": "CNY"
           }
         ],
         "total": "搜索结果总数"

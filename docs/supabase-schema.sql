@@ -220,6 +220,35 @@ CREATE TABLE IF NOT EXISTS message_templates (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- 数据源配置表：仅保留A股(CN)/港股(HK)
+CREATE TABLE IF NOT EXISTS data_source_configs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    market_type text NOT NULL CHECK (market_type IN ('CN', 'HK')),
+    provider text NOT NULL CHECK (provider IN ('YAHOO_FINANCE', 'ALPHA_VANTAGE')),
+    api_key text,
+    cache_ttl integer NOT NULL DEFAULT 120,
+    is_active boolean DEFAULT true,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now()
+);
+
+-- 允许的股票白名单：仅A股(CN)/港股(HK)
+CREATE TABLE IF NOT EXISTS allowed_stocks (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    symbol text NOT NULL,
+    market_type text NOT NULL CHECK (market_type IN ('CN', 'HK')),
+    display_name text,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now()
+);
+
+-- 用户角色表（admin/user，控制权限）
+CREATE TABLE IF NOT EXISTS user_roles (
+    user_id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+    role text NOT NULL CHECK (role IN ('admin', 'user')),
+    created_at timestamp with time zone DEFAULT now()
+);
+
 -- 创建索引以提高查询性能
 
 -- 用户表索引
@@ -290,6 +319,20 @@ CREATE INDEX IF NOT EXISTS idx_system_messages_read ON system_messages(read);
 -- 消息模板表索引
 CREATE INDEX IF NOT EXISTS idx_message_templates_type ON message_templates(type);
 
+-- 数据源配置表索引
+CREATE INDEX IF NOT EXISTS idx_data_source_configs_market_type ON data_source_configs(market_type);
+CREATE INDEX IF NOT EXISTS idx_data_source_configs_is_active ON data_source_configs(is_active);
+CREATE INDEX IF NOT EXISTS idx_data_source_configs_provider ON data_source_configs(provider);
+
+-- 允许的股票白名单索引
+CREATE INDEX IF NOT EXISTS idx_allowed_stocks_symbol ON allowed_stocks(symbol);
+CREATE INDEX IF NOT EXISTS idx_allowed_stocks_market_type ON allowed_stocks(market_type);
+CREATE INDEX IF NOT EXISTS idx_allowed_stocks_market_symbol ON allowed_stocks(market_type, symbol);
+
+-- 用户角色表索引
+CREATE INDEX IF NOT EXISTS idx_user_roles_user_id ON user_roles(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_roles_role ON user_roles(role);
+
 -- 插入默认系统管理员：用户名 admin，密码 admin123456（首次登录后请修改）
 INSERT INTO admins (username, password_hash, role, status) 
 VALUES ('admin', '$2b$10$cnZ4dnGlW.FdiM5JNDx9nO5ebbS8EcQGWWDWQ0j24GpBOsp7SGDum', 'super_admin', 'active')
@@ -338,6 +381,98 @@ ALTER TABLE organizations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE invitation_codes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE system_messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE message_templates ENABLE ROW LEVEL SECURITY;
+ALTER TABLE data_source_configs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE allowed_stocks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_roles ENABLE ROW LEVEL SECURITY;
+
+-- 数据源配置表RLS策略（完全符合PostgreSQL语法）
+-- 仅管理员可执行所有操作（用FOR ALL + USING，兼容所有操作类型）
+CREATE POLICY "Admins can manage data sources" ON public.data_source_configs
+  FOR ALL 
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.user_roles 
+      WHERE user_id = auth.uid() AND role = 'admin'
+    )
+  );
+
+-- 普通用户完全禁止访问数据源配置
+CREATE POLICY "Non-admins cannot access data sources" ON public.data_source_configs
+  FOR SELECT 
+  USING (false);
+
+-- 股票白名单RLS策略（核心修正：区分USING/WITH CHECK）
+-- 所有人可查询白名单（SELECT用USING）
+CREATE POLICY "Public can view allowed stocks" ON public.allowed_stocks
+  FOR SELECT 
+  USING (true);
+
+-- 仅管理员可新增白名单（INSERT必须用WITH CHECK）
+CREATE POLICY "Admins can insert allowed stocks" ON public.allowed_stocks
+  FOR INSERT 
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.user_roles 
+      WHERE user_id = auth.uid() AND role = 'admin'
+    )
+  );
+
+-- 仅管理员可更新白名单（UPDATE可用USING）
+CREATE POLICY "Admins can update allowed stocks" ON public.allowed_stocks
+  FOR UPDATE 
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.user_roles 
+      WHERE user_id = auth.uid() AND role = 'admin'
+    )
+  );
+
+-- 仅管理员可删除白名单（DELETE可用USING）
+CREATE POLICY "Admins can delete allowed stocks" ON public.allowed_stocks
+  FOR DELETE 
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.user_roles 
+      WHERE user_id = auth.uid() AND role = 'admin'
+    )
+  );
+
+-- 用户角色表RLS策略（符合语法规范）
+-- 用户可查看自己的角色（SELECT用USING）
+CREATE POLICY "Users can view their own role" ON public.user_roles
+  FOR SELECT 
+  USING (user_id = auth.uid());
+
+-- 仅管理员可管理用户角色（FOR ALL + USING）
+CREATE POLICY "Admins can manage user roles" ON public.user_roles
+  FOR ALL 
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.user_roles 
+      WHERE user_id = auth.uid() AND role = 'admin'
+    )
+  );
+
+-- 自动更新updated_at触发器
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- 数据源配置表触发器
+CREATE TRIGGER update_data_source_configs_updated_at
+BEFORE UPDATE ON public.data_source_configs
+FOR EACH ROW
+EXECUTE FUNCTION update_updated_at_column();
+
+-- 股票白名单表触发器
+CREATE TRIGGER update_allowed_stocks_updated_at
+BEFORE UPDATE ON public.allowed_stocks
+FOR EACH ROW
+EXECUTE FUNCTION update_updated_at_column();
 
 -- 创建审计日志触发器函数
 CREATE OR REPLACE FUNCTION audit_trigger_function()
@@ -396,11 +531,14 @@ COMMENT ON TABLE organizations IS '机构表，存储机构信息';
 COMMENT ON TABLE invitation_codes IS '邀请码表，存储用户邀请码信息';
 COMMENT ON TABLE system_messages IS '系统消息表，存储系统发送给用户的消息';
 COMMENT ON TABLE message_templates IS '消息模板表，存储消息模板';
+COMMENT ON TABLE data_source_configs IS '数据源配置表，管理不同市场的数据源提供商、缓存策略';
+COMMENT ON TABLE allowed_stocks IS '允许的股票白名单，控制客户端可访问的股票';
+COMMENT ON TABLE user_roles IS '用户角色表，控制用户权限（admin/user）';
 
 -- 完成消息
 DO $$
 BEGIN
     RAISE NOTICE '数据库建表脚本执行完成！';
-    RAISE NOTICE '已创建15个表，包含所有必要的约束、索引、默认数据、RLS和审计触发器。';
-    RAISE NOTICE '此版本为完整版，包含机构管理、邀请码、系统消息等新增功能。';
+    RAISE NOTICE '已创建18个表，包含所有必要的约束、索引、默认数据、RLS和审计触发器。';
+    RAISE NOTICE '此版本为完整版，包含机构管理、邀请码、系统消息、数据源配置、用户角色等新增功能。';
 END $$;

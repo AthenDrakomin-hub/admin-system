@@ -15,7 +15,6 @@ const cache = {
   }
 };
 
-import { fetchSinaQuote } from './sina-quote';
 import { logAudit } from './audit';
 import { supabase } from './supabase';
 
@@ -28,33 +27,67 @@ export async function fetchMarketData(symbol: string) {
     const cached = await cache.get(`market:${symbol}`);
     if (cached) return cached;
     
-    const quote = await Promise.race([
-      fetchSinaQuote(symbol),
-      new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('API timeout')), API_TIMEOUT)
-      )
-    ]) as any;
+    // 根据symbol判断市场类型
+    const market = symbol.startsWith('6') ? 'CN' : 
+                  (symbol.startsWith('0') || symbol.startsWith('3')) ? 'CN' : 'HK';
     
-    if (quote) {
-      // 自动存入数据库（如果不存在）
-      if (supabase && quote.name) {
-        const market = symbol.startsWith('6') ? 'sh' : symbol.startsWith('0') || symbol.startsWith('3') ? 'sz' : 'hk';
-        const currency = market === 'hk' ? 'HKD' : 'CNY';
-        
-        try {
-          await supabase.from('stocks').upsert({
-            symbol,
-            name: quote.name,
-            market,
-            currency
-          }, { onConflict: 'symbol' });
-        } catch {}
-      }
-      
-      await cache.set(`market:${symbol}`, quote, CACHE_TTL);
-      await cache.set(`market:fallback:${symbol}`, quote, FALLBACK_TTL);
-      return quote;
+    // 调用数据源API
+    const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ''}/api/data-source/${symbol}?market=${market}`, {
+      next: { revalidate: 0 }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Data source API failed with status: ${response.status}`);
     }
+    
+    const data = await response.json();
+    
+    // 映射数据格式
+    const quote = {
+      symbol: data.symbol,
+      name: '', // 数据源API可能不返回名称，需要从数据库获取或留空
+      price: data.price || 0,
+      change: data.change || 0,
+      changePercent: data.percentChange || 0,
+      open: data.price || 0, // 数据源API可能不返回开盘价，暂时用当前价格
+      close: data.price || 0, // 数据源API可能不返回收盘价，暂时用当前价格
+      high: data.price || 0, // 数据源API可能不返回最高价，暂时用当前价格
+      low: data.price || 0, // 数据源API可能不返回最低价，暂时用当前价格
+      volume: 0, // 数据源API可能不返回成交量
+      amount: 0, // 数据源API可能不返回成交额
+      timestamp: data.updatedAt || new Date().toISOString()
+    };
+    
+    // 自动存入数据库（如果不存在）
+    if (supabase && quote.symbol) {
+      const dbMarket = symbol.startsWith('6') ? 'sh' : symbol.startsWith('0') || symbol.startsWith('3') ? 'sz' : 'hk';
+      const currency = dbMarket === 'hk' ? 'HKD' : 'CNY';
+      
+      try {
+        // 尝试从数据库获取股票名称
+        const { data: stockData } = await supabase
+          .from('stocks')
+          .select('name')
+          .eq('symbol', symbol)
+          .single();
+        
+        if (stockData?.name) {
+          quote.name = stockData.name;
+        }
+        
+        // 更新或插入股票信息
+        await supabase.from('stocks').upsert({
+          symbol,
+          name: quote.name,
+          market: dbMarket,
+          currency
+        }, { onConflict: 'symbol' });
+      } catch {}
+    }
+    
+    await cache.set(`market:${symbol}`, quote, CACHE_TTL);
+    await cache.set(`market:fallback:${symbol}`, quote, FALLBACK_TTL);
+    return quote;
   } catch (error: any) {
     console.error('Market API error:', error.message);
     
