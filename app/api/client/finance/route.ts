@@ -82,14 +82,23 @@ export async function POST(request: Request) {
         );
       }
 
-      // 更新用户余额
-      await supabase
+      // 更新用户余额 - 先查询当前余额，然后更新
+      const { data: currentUser } = await supabase
         .from('users')
-        .update({
-          balance_cny: supabase.raw(`balance_cny + ${amount}`),
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', userId);
+        .select('balance_cny')
+        .eq('id', userId)
+        .single();
+      
+      if (currentUser) {
+        const newBalance = (currentUser.balance_cny || 0) + amount;
+        await supabase
+          .from('users')
+          .update({
+            balance_cny: newBalance,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', userId);
+      }
 
       // 记录流水
       await supabase
@@ -130,6 +139,13 @@ export async function POST(request: Request) {
         .eq('id', userId)
         .single();
 
+      if (!user) {
+        return NextResponse.json(
+          { success: false, error: '用户不存在' },
+          { status: 404 }
+        );
+      }
+
       const balance = currency === 'CNY' ? user.balance_cny : user.balance_hkd;
       if (balance < amount) {
         return NextResponse.json(
@@ -161,15 +177,25 @@ export async function POST(request: Request) {
         );
       }
 
-      // 更新用户余额
+      // 更新用户余额 - 先查询当前余额，然后更新
       const balanceField = currency === 'CNY' ? 'balance_cny' : 'balance_hkd';
-      await supabase
+      const { data: currentUser } = await supabase
         .from('users')
-        .update({
-          [balanceField]: supabase.raw(`${balanceField} - ${amount}`),
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', userId);
+        .select(balanceField)
+        .eq('id', userId)
+        .single();
+      
+      if (currentUser) {
+        const currentBalance = (currentUser as any)[balanceField] || 0;
+        const newBalance = currentBalance - amount;
+        await supabase
+          .from('users')
+          .update({
+            [balanceField]: newBalance,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', userId);
+      }
 
       // 记录流水
       await supabase

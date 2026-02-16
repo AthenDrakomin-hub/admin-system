@@ -51,13 +51,15 @@ export async function GET(
       case 'YAHOO_FINANCE':
         const querySymbol = market === 'CN' ? `${symbol}.SS` : `${symbol}.HK`;
         const quote = await yahooFinance.quote(querySymbol);
+        // 类型断言，确保quote有预期的属性
+        const yahooQuote = quote as any;
         data = {
           symbol,
           market,
-          price: quote.regularMarketPrice,
-          change: quote.regularMarketChange,
-          percentChange: quote.regularMarketChangePercent,
-          currency: quote.currency,
+          price: yahooQuote.regularMarketPrice || 0,
+          change: yahooQuote.regularMarketChange || 0,
+          percentChange: yahooQuote.regularMarketChangePercent || 0,
+          currency: yahooQuote.currency || (market === 'CN' ? 'CNY' : 'HKD'),
           updatedAt: new Date().toISOString(),
           provider: 'YAHOO_FINANCE'
         };

@@ -11,10 +11,10 @@ const getSupabase = () => {
     process.env.NEXT_PUBLIC_SUPABASE_URL!, // 你的Supabase地址
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, // 你的匿名密钥
     { 
-      cookies: { 
-        get: (name) => cookieStore.get(name)?.value,
-        set: (name, value, options) => cookieStore.set({ name, value, ...options }),
-        remove: (name, options) => cookieStore.delete({ name, ...options })
+      cookies: {
+        get(name: string) {
+          return cookieStore.get(name)?.value;
+        },
       } 
     }
   );
@@ -22,10 +22,17 @@ const getSupabase = () => {
 
 // 初始化Admin级Supabase（用于删除用户，适配你的服务端密钥）
 const getAdminSupabase = () => {
+  const cookieStore = cookies();
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_SUPABASE_SERVICE_ROLE_KEY!, // 你的服务端角色密钥
-    { cookies: { get: () => {} } } // 管理员接口无需cookie
+    { 
+      cookies: {
+        get(name: string) {
+          return cookieStore.get(name)?.value;
+        },
+      } 
+    }
   );
 };
 

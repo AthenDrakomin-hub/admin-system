@@ -71,13 +71,19 @@ export const approveWithdrawRequest = async (requestId: string, approve: boolean
   const supabase = getSupabase();
   
   // 1. 更新申请状态
+  const updateData: any = {
+    status: approve ? 'approved' : 'rejected',
+    updated_at: new Date().toISOString()
+  };
+  
+  // 如果审批通过，将未结清金额设为0
+  if (approve) {
+    updateData.unsettled_amount = 0;
+  }
+  
   const { error } = await supabase
     .from('withdraw_requests')
-    .update({
-      status: approve ? 'approved' : 'rejected',
-      unsettled_amount: approve ? 0 : supabase.raw('unsettled_amount'),
-      updated_at: new Date().toISOString()
-    })
+    .update(updateData)
     .eq('request_id', requestId);
   
   if (error) {
