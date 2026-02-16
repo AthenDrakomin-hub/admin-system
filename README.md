@@ -121,44 +121,443 @@ npm start
 ### 🔐 客户端API (用户端)
 
 #### 认证相关
-- **用户登录**: `POST /api/client/auth`
-- **用户注册**: `POST /api/client/auth?action=register`
-- **刷新Token**: `POST /api/client/auth?action=refresh`
+- **用户登录**: `POST /api/client/auth` - 使用用户名密码登录，返回JWT令牌
+  - **请求参数**:
+    ```json
+    {
+      "username": "string, 必填, 用户名",
+      "password": "string, 必填, 密码"
+    }
+    ```
+  - **响应成功**:
+    ```json
+    {
+      "success": true,
+      "data": {
+        "token": "JWT令牌，有效期7天",
+        "user": {
+          "id": "用户ID",
+          "username": "用户名"
+        }
+      }
+    }
+    ```
+  - **错误响应**:
+    - `400`: 缺少用户名或密码
+    - `401`: 用户名或密码错误
+    - `403`: 账户已被冻结
+    - `500`: 服务器内部错误
+
+- **获取用户信息**: `GET /api/client/auth` - 验证令牌并返回完整用户信息
+  - **请求头**: `Authorization: Bearer <JWT令牌>`
+  - **响应成功**:
+    ```json
+    {
+      "success": true,
+      "data": {
+        "user": {
+          "id": "用户ID",
+          "username": "用户名",
+          "phone": "手机号",
+          "real_name": "真实姓名",
+          "id_card": "身份证号",
+          "status": "账户状态 (active/frozen/pending)",
+          "created_at": "注册时间",
+          "balance_cny": "人民币余额",
+          "balance_hkd": "港币余额",
+          "frozen_balance_cny": "冻结人民币",
+          "frozen_balance_hkd": "冻结港币",
+          "total_deposit": "累计充值",
+          "total_withdraw": "累计提现",
+          "trade_days": "交易天数"
+        }
+      }
+    }
+    ```
+  - **错误响应**:
+    - `401`: 未授权或令牌无效
+    - `404`: 用户不存在
+    - `500`: 服务器内部错误
+
+#### 用户注册
+- **客户端用户注册**: `POST /api/client/register` - 使用邀请码提交注册申请
+  ```javascript
+  // 请求示例
+  {
+    "invite_code": "ABC123DEF",      // 必填：邀请码
+    "username": "new_user",          // 必填：用户名
+    "password": "secure_password123", // 必填：密码
+    "real_name": "张三",             // 必填：真实姓名
+    "phone": "13800138000",          // 必填：手机号
+    "email": "user@example.com",     // 可选：邮箱
+    "id_card": "身份证号"            // 可选：身份证
+  }
+  
+  // 响应示例（成功）
+  {
+    "success": true,
+    "message": "注册申请已提交，请等待管理员审核",
+    "data": {
+      "user_id": "生成的用户ID",
+      "username": "new_user",
+      "real_name": "张三",
+      "phone": "13800138000",
+      "status": "pending",
+      "organization_id": "机构ID",
+      "created_at": "2024-01-01T00:00:00.000Z",
+      "next_step": "等待管理员审核，审核通过后会收到站内信通知"
+    }
+  }
+  ```
+
+- **检查用户名可用性**: `GET /api/client/register?username=test_user` - 检查用户名是否可用
+
+#### 用户审核流程
+用户注册后的完整审核流程：
+
+1. **注册提交**：客户端通过`POST /api/client/register`提交注册申请
+2. **状态设置**：新用户状态自动设置为`pending`（待审核）
+3. **管理员审核**：
+   - 获取待审核用户：`GET /api/admin/audits?type=user&status=pending`
+   - 审核通过：`POST /api/admin/audits` (action: 'approve')
+   - 审核驳回：`POST /api/admin/audits` (action: 'reject')
+4. **账号激活**：审核通过后，用户状态从`pending`变为`active`
+5. **站内信通知**：审核通过/驳回时自动发送系统消息通知用户
+6. **登录权限**：只有`active`状态的用户才能登录客户端
+
+#### 邀请码系统（控制注册权限）
+- **获取邀请码列表**: `GET /api/admin/invites` - 查看所有邀请码
+- **生成邀请码**: `POST /api/admin/invites` - 批量生成邀请码
+- **管理邀请码**: `POST /api/admin/invites` - 启用/禁用/延长有效期
 
 #### 账户管理
-- **获取账户信息**: `GET /api/client/account`
-- **更新账户信息**: `PUT /api/client/account`
-- **修改密码**: `POST /api/client/account?action=change_password`
+- **获取账户综合信息**: `GET /api/client/account` - 返回用户信息、余额、持仓、流水等综合数据
+  - **请求头**: `Authorization: Bearer <JWT令牌>`
+  - **响应成功**:
+    ```json
+    {
+      "success": true,
+      "data": {
+        "user": { "id", "username", "phone", "real_name", "id_card", "status", "created_at", "trade_days" },
+        "balances": {
+          "cny": { "available": "可用余额", "frozen": "冻结金额", "total": "总额" },
+          "hkd": { "available": "可用余额", "frozen": "冻结金额", "total": "总额" },
+          "total_deposit": "累计充值",
+          "total_withdraw": "累计提现"
+        },
+        "positions": {
+          "count": "持仓数量",
+          "total_market_value": "总市值",
+          "total_cost": "总成本",
+          "total_profit_loss": "总盈亏",
+          "total_profit_loss_rate": "总盈亏率",
+          "items": ["持仓列表"]
+        },
+        "recent_activity": {
+          "pending_orders": "待审核订单数",
+          "recent_flows": ["最近流水"]
+        },
+        "summary": {
+          "total_assets_cny": "人民币总资产",
+          "total_assets_hkd": "港币总资产",
+          "total_frozen_cny": "冻结人民币",
+          "total_frozen_hkd": "冻结港币",
+          "net_asset_value": "净资产值",
+          "last_updated": "最后更新时间"
+        }
+      }
+    }
+    ```
+
+- **获取持仓详情**: `POST /api/client/account` - 获取指定或全部持仓信息
+  - **请求头**: `Authorization: Bearer <JWT令牌>`
+  - **请求参数**:
+    ```json
+    {
+      "symbol": "string, 可选, 股票代码 (如: 000001)"
+    }
+    ```
+  - **响应成功**:
+    ```json
+    {
+      "success": true,
+      "data": {
+        "positions": [
+          {
+            "id": "持仓ID",
+            "symbol": "股票代码",
+            "symbol_name": "股票名称",
+            "quantity": "持仓数量",
+            "available_quantity": "可用数量",
+            "avg_cost": "平均成本",
+            "market_value": "市值",
+            "profit_loss": "盈亏",
+            "profit_loss_rate": "盈亏率",
+            "updated_at": "更新时间"
+          }
+        ]
+      }
+    }
+    ```
 
 #### 财务管理
-- **获取资金信息**: `GET /api/client/finance`
-- **充值申请**: `POST /api/client/finance?action=recharge`
-- **提现申请**: `POST /api/client/finance?action=withdraw`
-- **交易流水**: `GET /api/client/finance?action=flows`
+- **充值/提现申请**: `POST /api/client/finance` - 提交充值或提现申请
+  - **请求头**: `Authorization: Bearer <JWT令牌>`
+  - **请求参数**:
+    ```json
+    {
+      "userId": "string, 必填, 用户ID",
+      "type": "string, 必填, 操作类型 (recharge/withdraw)",
+      "amount": "number, 必填, 金额",
+      "currency": "string, 可选, 货币类型 (CNY/HKD, 默认CNY)",
+      "paymentMethod": "string, 可选, 支付方式",
+      "bankInfo": {
+        "bankName": "string, 提现必填, 银行名称",
+        "bankAccount": "string, 提现必填, 银行账号",
+        "accountHolder": "string, 提现必填, 账户持有人"
+      }
+    }
+    ```
+  - **响应成功**:
+    ```json
+    {
+      "success": true,
+      "data": {
+        "requestId": "申请ID",
+        "status": "pending",
+        "unsettledAmount": "未结清金额（仅提现时返回）"
+      }
+    }
+    ```
+  - **错误响应**:
+    - `400`: 缺少必要参数或余额不足
+    - `401`: 未授权
+    - `500`: 服务器内部错误
+
+- **获取交易流水**: `GET /api/client/finance` - 查询用户资金流水记录
+  - **请求头**: `Authorization: Bearer <JWT令牌>`
+  - **查询参数**: `?userId=<用户ID>`
+  - **响应成功**:
+    ```json
+    {
+      "success": true,
+      "data": {
+        "flows": [
+          {
+            "id": "流水ID",
+            "type": "流水类型 (deposit/withdraw/trade/adjust)",
+            "amount": "金额",
+            "currency": "货币",
+            "balance_after": "操作后余额",
+            "description": "描述",
+            "created_at": "创建时间",
+            "settled": "是否已结清"
+          }
+        ]
+      }
+    }
+    ```
 
 #### 市场数据
-- **股票行情**: `GET /api/client/market?symbol=600000`
-- **股票搜索**: `GET /api/client/market/search?keyword=浦发银行`
-- **市场异常**: `GET /api/client/market/anomalies`
-- **股票列表**: `GET /api/client/market/stocks?market=a_share`
+- **市场数据接口**: `GET /api/client/market` - 获取市场相关数据
+  - **查询参数**: `?symbol=<股票代码>&type=<数据类型>`
+  - **响应成功**:
+    ```json
+    {
+      "success": true,
+      "data": {
+        "symbol": "股票代码",
+        "name": "股票名称",
+        "current_price": "当前价格",
+        "change": "涨跌额",
+        "change_percent": "涨跌幅",
+        "volume": "成交量",
+        "amount": "成交额",
+        "high": "最高价",
+        "low": "最低价",
+        "open": "开盘价",
+        "close": "收盘价",
+        "timestamp": "数据时间"
+      }
+    }
+    ```
+
+- **股票搜索**: `GET /api/client/market/search` - 搜索股票信息
+  - **查询参数**: `?keyword=<搜索关键词>`
+  - **响应成功**:
+    ```json
+    {
+      "success": true,
+      "data": {
+        "stocks": [
+          {
+            "symbol": "股票代码",
+            "name": "股票名称",
+            "market": "市场类型 (a_share/hk_share)",
+            "current_price": "当前价格",
+            "change_percent": "涨跌幅"
+          }
+        ],
+        "total": "搜索结果总数"
+      }
+    }
+    ```
+
+- **市场异常检测**: `GET /api/client/market/anomalies` - 获取市场异常数据
+  - **查询参数**: `?date=<日期>&type=<异常类型>`
+  - **响应成功**:
+    ```json
+    {
+      "success": true,
+      "data": {
+        "anomalies": [
+          {
+            "symbol": "股票代码",
+            "name": "股票名称",
+            "anomaly_type": "异常类型",
+            "description": "异常描述",
+            "detected_at": "检测时间",
+            "severity": "严重程度"
+          }
+        ]
+      }
+    }
+    ```
+
+- **股票列表**: `GET /api/client/market/stocks` - 获取股票列表
+  - **查询参数**: `?market=<市场类型>&page=<页码>&limit=<每页数量>`
+  - **响应成功**:
+    ```json
+    {
+      "success": true,
+      "data": {
+        "stocks": ["股票列表"],
+        "pagination": {
+          "page": "当前页码",
+          "limit": "每页数量",
+          "total": "总数",
+          "pages": "总页数"
+        }
+      }
+    }
+    ```
 
 #### 交易相关
-- **A股交易**: `POST /api/client/trade/a-share`
-- **港股交易**: `POST /api/client/trade/hk-share`
-- **大宗交易**: `POST /api/client/trade/block`
-- **IPO申购**: `POST /api/client/trade/ipo`
-- **一键打板**: `POST /api/client/trade/board`
-- **条件单**: `POST /api/client/order/conditional`
+- **A股交易**: `POST /api/client/trade/a-share` - 提交A股交易订单
+  - **请求头**: `Authorization: Bearer <JWT令牌>`
+  - **请求参数**:
+    ```json
+    {
+      "symbol": "string, 必填, 股票代码",
+      "side": "string, 必填, 买卖方向 (buy/sell)",
+      "quantity": "number, 必填, 数量",
+      "price": "number, 可选, 价格 (市价单可不填)",
+      "order_type": "string, 必填, 订单类型 (market/limit)",
+      "condition": "string, 可选, 条件 (如: 开盘价)"
+    }
+    ```
+  - **响应成功**:
+    ```json
+    {
+      "success": true,
+      "data": {
+        "order_id": "订单ID",
+        "status": "pending",
+        "symbol": "股票代码",
+        "side": "买卖方向",
+        "quantity": "数量",
+        "estimated_amount": "预计金额",
+        "message": "订单已提交，等待审核"
+      }
+    }
+    ```
+
+- **港股交易**: `POST /api/client/trade/hk-share` - 提交港股交易订单
+  - 参数和响应格式与A股交易类似，货币单位为HKD
+
+- **大宗交易**: `POST /api/client/trade/block` - 提交大宗交易订单
+  - 参数和响应格式与A股交易类似，有额外的批量交易参数
+
+- **IPO申购**: `POST /api/client/trade/ipo` - 提交IPO申购申请
+  - **请求参数**:
+    ```json
+    {
+      "symbol": "新股代码",
+      "quantity": "申购数量",
+      "price": "申购价格",
+      "fund_source": "资金来源"
+    }
+    ```
+
+- **一键打板**: `POST /api/client/trade/board` - 提交打板交易订单
+  - 参数和响应格式与A股交易类似，适用于快速打板交易
 
 #### 订单管理
-- **订单列表**: `GET /api/client/order?type=all`
-- **取消订单**: `POST /api/client/order?action=cancel`
+- **订单管理**: `GET /api/client/order` - 获取订单列表
+  - **请求头**: `Authorization: Bearer <JWT令牌>`
+  - **查询参数**: `?type=<订单类型>&status=<状态>&page=<页码>`
+  - **响应成功**:
+    ```json
+    {
+      "success": true,
+      "data": {
+        "orders": [
+          {
+            "id": "订单ID",
+            "symbol": "股票代码",
+            "symbol_name": "股票名称",
+            "side": "买卖方向",
+            "quantity": "数量",
+            "price": "价格",
+            "order_type": "订单类型",
+            "status": "状态",
+            "created_at": "创建时间",
+            "updated_at": "更新时间"
+          }
+        ],
+        "pagination": {
+          "page": "当前页码",
+          "limit": "每页数量",
+          "total": "总数",
+          "pages": "总页数"
+        }
+      }
+    }
+    ```
+
+- **条件单管理**: `POST /api/client/order/conditional` - 提交条件单
+  - **请求参数**:
+    ```json
+    {
+      "symbol": "股票代码",
+      "side": "买卖方向",
+      "quantity": "数量",
+      "condition_type": "条件类型 (price/volume/time)",
+      "condition_value": "条件值",
+      "order_type": "订单类型",
+      "price": "价格",
+      "expires_at": "过期时间"
+    }
+    ```
 
 #### 用户信息
-- **用户信息**: `GET /api/client/user`
-- **持仓信息**: `GET /api/client/user?action=positions`
-- **站内信**: `GET /api/client/user/messages`
-- **标记已读**: `POST /api/client/user/messages?action=mark_read`
+- **用户信息管理**: `GET /api/client/user` - 获取用户相关信息
+  - **请求头**: `Authorization: Bearer <JWT令牌>`
+  - **响应成功**:
+    ```json
+    {
+      "success": true,
+      "data": {
+        "user": {
+          "id": "用户ID",
+          "username": "用户名",
+          "profile": "用户资料",
+          "preferences": "用户偏好",
+          "settings": "用户设置"
+        }
+      }
+    }
+    ```
 
 ### 🛠️ 管理端API
 

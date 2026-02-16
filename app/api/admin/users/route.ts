@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { createAdminClient } from '@/lib/supabase';
+import bcrypt from 'bcryptjs';
 import { verifyAdminAuth } from '@/lib/auth';
 
 /**
@@ -17,74 +18,74 @@ export async function GET(req: NextRequest) {
     // 验证管理员身份
     const authHeader = req.headers.get('Authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json({ success: false, error: '未授权访问' }, { status: 401 });
+      return NextResponse.json(
+        { success: false, error: '未授权访问' },
+        { status: 401 }
+      );
     }
 
     const token = authHeader.substring(7);
     const admin = await verifyAdminAuth(token);
 
     if (!admin) {
-      return NextResponse.json({ success: false, error: '无效的管理员认证' }, { status: 401 });
+      return NextResponse.json(
+        { success: false, error: '无效的管理员认证' },
+        { status: 401 }
+      );
     }
 
     // 检查权限
     if (!admin.permissions?.canManageUsers) {
-      return NextResponse.json({ success: false, error: '无用户管理权限' }, { status: 403 });
+      return NextResponse.json(
+        { success: false, error: '无用户管理权限' },
+        { status: 403 }
+      );
     }
 
-    const { searchParams } = new URL(req.url);
-    const status = searchParams.get('status') || 'all';
-    const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '20');
-    const orgId = searchParams.get('orgId');
-    const startDate = searchParams.get('startDate');
-    const endDate = searchParams.get('endDate');
-    const search = searchParams.get('search'); // 搜索用户名或真实姓名
-
-    if (!supabase) {
-      return NextResponse.json({ success: false, error: '数据库未配置' }, { status: 500 });
-    }
-
-    let query = supabase
+    // 创建带RLS上下文的管理员客户端
+    const adminClient = await createAdminClient(admin.username);
+    
+    // 查询用户列表（关联机构表，解决组织权限问题）
+    const { data: users, error } = await adminClient
       .from('users')
-      .select('*, organizations(name)', { count: 'exact' });
+      .select(`
+        id,
+        username,
+        real_name,
+        phone,
+        email,
+        balance_cny,
+        balance_hkd,
+        status,
+        organization_id,
+        created_at,
+        updated_at,
+        organizations:organization_id (id, name, code) // 关联机构信息
+      `)
+      .order('created_at', { ascending: false });
 
-    // 筛选条件
-    if (status !== 'all') {
-      query = query.eq('status', status);
-    }
-    if (orgId) {
-      query = query.eq('organization_id', orgId);
-    }
-    if (startDate) {
-      query = query.gte('created_at', startDate);
-    }
-    if (endDate) {
-      query = query.lte('created_at', endDate);
-    }
-    if (search) {
-      query = query.or(`username.ilike.%${search}%,real_name.ilike.%${search}%`);
+    // 捕获查询错误
+    if (error) {
+      console.error('查询用户列表失败:', error.message);
+      return NextResponse.json(
+        { success: false, error: `查询用户失败: ${error.message}` },
+        { status: 500 }
+      );
     }
 
-    const { data: users, count, error } = await query
-      .order('created_at', { ascending: false })
-      .range((page - 1) * limit, page * limit - 1);
-
-    if (error) throw error;
-
+    // 返回成功结果
     return NextResponse.json({
       success: true,
       data: users || [],
-      pagination: {
-        page,
-        limit,
-        total: count || 0,
-        pages: Math.ceil((count || 0) / limit)
-      }
+      total: users?.length || 0,
     });
-  } catch (error: any) {
-    console.error('用户管理API错误:', error);
-    return NextResponse.json({ success: false, error: error.message || '获取用户列表失败' }, { status: 500 });
+  } catch (err) {
+    // 全局异常捕获（关键！解决500错误）
+    console.error('GET /api/admin/users 异常:', err);
+    return NextResponse.json(
+      { success: false, error: '服务器内部错误' },
+      { status: 500 }
+    );
   }
 }
 
@@ -121,10 +122,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: '缺少用户ID' }, { status: 400 });
     }
 
-    if (!supabase) {
-      return NextResponse.json({ success: false, error: '数据库未配置' }, { status: 500 });
-    }
-
+    // 创建带RLS上下文的管理员客户端
+    const adminClient = await createAdminClient(admin.username);
+    
     let result;
     let newUserId = null;
     let auditData: any = {
@@ -140,7 +140,7 @@ export async function POST(req: NextRequest) {
     switch (action) {
       case 'freeze':
         // 冻结用户
-        result = await supabase
+        result = await adminClient
           .from('users')
           .update({
             status: 'frozen',
@@ -154,7 +154,7 @@ export async function POST(req: NextRequest) {
 
       case 'unfreeze':
         // 解冻用户
-        result = await supabase
+        result = await adminClient
           .from('users')
           .update({
             status: 'active',
@@ -170,14 +170,13 @@ export async function POST(req: NextRequest) {
 
       case 'reset_password':
         // 重置密码
-        const bcrypt = require('bcryptjs');
         const defaultPassword = process.env.ADMIN_DEFAULT_PASSWORD || '123456';
-        const hashedPassword = await bcrypt.hash(defaultPassword, 10);
+        const resetPasswordHash = await bcrypt.hash(defaultPassword, 10);
         
-        result = await supabase
+        result = await adminClient
           .from('users')
           .update({
-            password_hash: hashedPassword,
+            password_hash: resetPasswordHash,
             password_reset_at: new Date().toISOString()
           })
           .eq('id', userId);
@@ -195,7 +194,7 @@ export async function POST(req: NextRequest) {
         const field = currency === 'CNY' ? 'balance_cny' : 'balance_hkd';
         
         // 获取当前余额
-        const { data: user } = await supabase
+        const { data: user } = await adminClient
           .from('users')
           .select(field)
           .eq('id', userId)
@@ -212,13 +211,13 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ success: false, error: '余额不足' }, { status: 400 });
         }
 
-        result = await supabase
+        result = await adminClient
           .from('users')
           .update({ [field]: newBalance })
           .eq('id', userId);
 
         // 生成流水记录
-        await supabase.from('transaction_flows').insert({
+        await adminClient.from('transaction_flows').insert({
           user_id: userId,
           type: 'adjust',
           amount: parseFloat(amount),
@@ -241,7 +240,7 @@ export async function POST(req: NextRequest) {
         }
         
         // 检查用户名是否已存在
-        const { data: existingUser } = await supabase
+        const { data: existingUser } = await adminClient
           .from('users')
           .select('id')
           .eq('username', userData.username)
@@ -251,9 +250,8 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ success: false, error: '用户名已存在' }, { status: 400 });
         }
         
-        // 加密密码
-        const bcrypt = require('bcryptjs');
-        const hashedPassword = await bcrypt.hash(userData.password, 10);
+        // 加密密码（使用不同的变量名，避免重复定义）
+        const newUserPasswordHash = await bcrypt.hash(userData.password, 10);
         
         // 准备用户数据
         const newUser = {
@@ -262,14 +260,14 @@ export async function POST(req: NextRequest) {
           phone: userData.phone || '',
           email: userData.email || null,
           id_card: userData.id_card || null,
-          password_hash: hashedPassword,
+          password_hash: newUserPasswordHash,
           organization_id: userData.organization_id || null,
           status: userData.status || 'pending',
           created_at: new Date().toISOString()
         };
         
         // 创建用户
-        result = await supabase
+        result = await adminClient
           .from('users')
           .insert([newUser]);
         
@@ -284,8 +282,8 @@ export async function POST(req: NextRequest) {
 
     if (result.error) throw result.error;
 
-    // 记录审计日志
-    await supabase.from('audit_logs').insert(auditData);
+    // 记录审计日志（现在有RLS上下文，可以正常插入）
+    await adminClient.from('audit_logs').insert(auditData);
 
     return NextResponse.json({
       success: true,
